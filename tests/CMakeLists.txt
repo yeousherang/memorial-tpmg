@@ -33,6 +33,13 @@ target_link_libraries(
 )
 add_test(NAME static.type_list COMMAND memorial_type_list_tests)
 
+add_executable(memorial_fixed_string_tests static/fixed_string.cpp)
+target_link_libraries(
+    memorial_fixed_string_tests
+    PRIVATE memorial::memorial memorial::warnings memorial::sanitizers
+)
+add_test(NAME static.fixed_string COMMAND memorial_fixed_string_tests)
+
 add_executable(memorial_unit_tests unit/version_test.cpp)
 target_link_libraries(
     memorial_unit_tests
