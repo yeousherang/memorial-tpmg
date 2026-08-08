@@ -38,6 +38,8 @@ ctest --preset dev
 
 ASan/UBSan 검증은 지원되는 Clang/GCC 환경에서 `asan` 프리셋으로 실행한다. 프리셋을 사용하지 않을 경우 일반적인 `cmake -S . -B build` 흐름도 지원한다.
 
+런타임 단위 테스트는 GoogleTest 1.17을 사용한다. CMake는 시스템에 설치된 패키지를 우선 사용하고, 찾지 못하면 구성 단계에서 고정된 릴리스를 가져온다. 네트워크 사용을 금지하려면 GoogleTest를 먼저 설치하고 `-DMEMORIAL_FETCH_DEPENDENCIES=OFF`를 지정한다. 타입 계약은 `static_assert`, 잘못된 코드 경로는 compile-fail 테스트로 계속 검증한다.
+
 ## 핵심 원칙
 
 - 역사적 사건과 그 사건에 대한 현재의 해석을 분리한다.

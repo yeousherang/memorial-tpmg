@@ -12,6 +12,7 @@ include(CTest)
 option(MEMORIAL_BUILD_EXAMPLES "Build Memorial examples" ON)
 option(MEMORIAL_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(MEMORIAL_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+option(MEMORIAL_FETCH_DEPENDENCIES "Fetch missing test dependencies" ON)
 
 add_library(memorial_warnings INTERFACE)
 add_library(memorial::warnings ALIAS memorial_warnings)
@@ -81,4 +82,3 @@ if(CLANG_FORMAT_EXECUTABLE)
         VERBATIM
     )
 endif()
-

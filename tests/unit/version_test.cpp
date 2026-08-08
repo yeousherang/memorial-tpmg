@@ -1,5 +1,5 @@
 #include <memorial/graph.hpp>
 
-#include <cassert>
+#include <gtest/gtest.h>
 
-int main() { assert(memorial::version() == "0.1.0"); }
+TEST(Version, ReportsProjectVersion) { EXPECT_EQ(memorial::version(), "0.1.0"); }
