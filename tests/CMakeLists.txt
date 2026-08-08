@@ -47,6 +47,13 @@ target_link_libraries(
 )
 add_test(NAME static.strong_id COMMAND memorial_strong_id_tests)
 
+add_executable(memorial_type_map_tests static/type_map.cpp)
+target_link_libraries(
+    memorial_type_map_tests
+    PRIVATE memorial::memorial memorial::warnings memorial::sanitizers
+)
+add_test(NAME static.type_map COMMAND memorial_type_map_tests)
+
 add_executable(memorial_unit_tests unit/strong_id_test.cpp unit/version_test.cpp)
 target_link_libraries(
     memorial_unit_tests
@@ -54,13 +61,31 @@ target_link_libraries(
 )
 gtest_discover_tests(memorial_unit_tests TEST_PREFIX "unit.")
 
-add_test(
-    NAME compile_fail.unsupported_standard
-    COMMAND
-        "${CMAKE_COMMAND}"
+function(memorial_add_compile_fail_test NAME SOURCE STANDARD)
+    set(OBJECT "${CMAKE_CURRENT_BINARY_DIR}/compile_fail/${NAME}.o")
+    set(COMMAND_ARGS
         -DCXX_COMPILER=${CMAKE_CXX_COMPILER}
         -DCXX_COMPILER_ID=${CMAKE_CXX_COMPILER_ID}
-        -DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/compile_fail/unsupported_standard.cpp
-        -DOBJECT=${CMAKE_CURRENT_BINARY_DIR}/compile_fail/unsupported_standard.o
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/compile_fail/expect_compile_failure.cmake
+        -DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/compile_fail/${SOURCE}
+        -DOBJECT=${OBJECT}
+        -DSTANDARD=${STANDARD}
+        -DINCLUDE_DIR=${PROJECT_SOURCE_DIR}/include
+    )
+    if(ARGC GREATER 3)
+        list(APPEND COMMAND_ARGS -DEXPECTED_PATTERN=${ARGV3})
+    endif()
+    add_test(
+        NAME compile_fail.${NAME}
+        COMMAND "${CMAKE_COMMAND}" ${COMMAND_ARGS}
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/compile_fail/expect_compile_failure.cmake
+    )
+endfunction()
+
+memorial_add_compile_fail_test(unsupported_standard unsupported_standard.cpp 17)
+memorial_add_compile_fail_test(
+    duplicate_type_map_key
+    duplicate_type_map_key.cpp
+    23
+    "type_map keys must be unique"
 )
+memorial_add_compile_fail_test(missing_type_map_key missing_type_map_key.cpp 23)

@@ -104,4 +104,51 @@ struct type_list_transform<Transform, type_list<Types...>> {
 template <template <typename> typename Transform, TypeList List>
 using type_list_transform_t = typename type_list_transform<Transform, List>::type;
 
+template <template <typename> typename Predicate, TypeList List> struct type_list_filter;
+
+template <template <typename> typename Predicate, typename... Types>
+struct type_list_filter<Predicate, type_list<Types...>> {
+    using type = type_list_concat_t<std::conditional_t<static_cast<bool>(Predicate<Types>::value),
+                                                       type_list<Types>, type_list<>>...>;
+};
+
+template <template <typename> typename Predicate, TypeList List>
+using type_list_filter_t = typename type_list_filter<Predicate, List>::type;
+
+template <template <typename> typename Predicate, TypeList List> struct type_list_all_of;
+
+template <template <typename> typename Predicate, typename... Types>
+struct type_list_all_of<Predicate, type_list<Types...>>
+    : std::bool_constant<(static_cast<bool>(Predicate<Types>::value) && ...)> {};
+
+template <template <typename> typename Predicate, TypeList List>
+inline constexpr bool type_list_all_of_v = type_list_all_of<Predicate, List>::value;
+
+template <template <typename> typename Predicate, TypeList List> struct type_list_any_of;
+
+template <template <typename> typename Predicate, typename... Types>
+struct type_list_any_of<Predicate, type_list<Types...>>
+    : std::bool_constant<(static_cast<bool>(Predicate<Types>::value) || ...)> {};
+
+template <template <typename> typename Predicate, TypeList List>
+inline constexpr bool type_list_any_of_v = type_list_any_of<Predicate, List>::value;
+
+struct type_list_not_found {};
+
+template <TypeList List, typename Fallback> struct type_list_front_or {
+    using type = type_list_front_t<List>;
+};
+
+template <typename Fallback> struct type_list_front_or<type_list<>, Fallback> {
+    using type = Fallback;
+};
+
+template <template <typename> typename Predicate, TypeList List,
+          typename Fallback = type_list_not_found>
+using type_list_find_if_or_t =
+    typename type_list_front_or<type_list_filter_t<Predicate, List>, Fallback>::type;
+
+template <template <typename> typename Predicate, TypeList List>
+using type_list_find_if_t = type_list_find_if_or_t<Predicate, List>;
+
 } // namespace memorial::meta
