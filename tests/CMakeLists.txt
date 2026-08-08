@@ -61,6 +61,13 @@ target_link_libraries(
 )
 add_test(NAME static.property COMMAND memorial_property_tests)
 
+add_executable(memorial_node_tests static/node.cpp)
+target_link_libraries(
+    memorial_node_tests
+    PRIVATE memorial::memorial memorial::warnings memorial::sanitizers
+)
+add_test(NAME static.node COMMAND memorial_node_tests)
+
 add_executable(memorial_unit_tests unit/strong_id_test.cpp unit/version_test.cpp)
 target_link_libraries(
     memorial_unit_tests
@@ -103,3 +110,11 @@ memorial_add_compile_fail_test(
     "property key must not be empty"
 )
 memorial_add_compile_fail_test(invalid_property_value invalid_property_value.cpp 23)
+memorial_add_compile_fail_test(
+    duplicate_node_property
+    duplicate_node_property.cpp
+    23
+    "node property keys must be unique"
+)
+memorial_add_compile_fail_test(invalid_node_property invalid_node_property.cpp 23)
+memorial_add_compile_fail_test(missing_node_property missing_node_property.cpp 23)
