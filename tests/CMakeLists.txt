@@ -54,6 +54,13 @@ target_link_libraries(
 )
 add_test(NAME static.type_map COMMAND memorial_type_map_tests)
 
+add_executable(memorial_property_tests static/property.cpp)
+target_link_libraries(
+    memorial_property_tests
+    PRIVATE memorial::memorial memorial::warnings memorial::sanitizers
+)
+add_test(NAME static.property COMMAND memorial_property_tests)
+
 add_executable(memorial_unit_tests unit/strong_id_test.cpp unit/version_test.cpp)
 target_link_libraries(
     memorial_unit_tests
@@ -89,3 +96,10 @@ memorial_add_compile_fail_test(
     "type_map keys must be unique"
 )
 memorial_add_compile_fail_test(missing_type_map_key missing_type_map_key.cpp 23)
+memorial_add_compile_fail_test(
+    empty_property_key
+    empty_property_key.cpp
+    23
+    "property key must not be empty"
+)
+memorial_add_compile_fail_test(invalid_property_value invalid_property_value.cpp 23)
