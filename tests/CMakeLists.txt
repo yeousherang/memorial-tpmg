@@ -40,7 +40,14 @@ target_link_libraries(
 )
 add_test(NAME static.fixed_string COMMAND memorial_fixed_string_tests)
 
-add_executable(memorial_unit_tests unit/version_test.cpp)
+add_executable(memorial_strong_id_tests static/strong_id.cpp)
+target_link_libraries(
+    memorial_strong_id_tests
+    PRIVATE memorial::memorial memorial::warnings memorial::sanitizers
+)
+add_test(NAME static.strong_id COMMAND memorial_strong_id_tests)
+
+add_executable(memorial_unit_tests unit/strong_id_test.cpp unit/version_test.cpp)
 target_link_libraries(
     memorial_unit_tests
     PRIVATE memorial::memorial memorial::warnings memorial::sanitizers GTest::gtest_main
