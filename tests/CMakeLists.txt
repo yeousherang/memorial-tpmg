@@ -89,6 +89,13 @@ target_link_libraries(
 )
 add_test(NAME static.relation_rules COMMAND memorial_relation_rules_tests)
 
+add_executable(memorial_domain_schema_tests static/memorial_schema.cpp)
+target_link_libraries(
+    memorial_domain_schema_tests
+    PRIVATE memorial::memorial memorial::warnings memorial::sanitizers
+)
+add_test(NAME static.memorial_schema COMMAND memorial_domain_schema_tests)
+
 add_executable(memorial_unit_tests unit/strong_id_test.cpp unit/version_test.cpp)
 target_link_libraries(
     memorial_unit_tests
