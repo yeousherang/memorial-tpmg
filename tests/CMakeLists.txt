@@ -22,6 +22,37 @@ endif()
 
 include(GoogleTest)
 
+file(
+    GLOB_RECURSE MEMORIAL_PUBLIC_HEADERS
+    CONFIGURE_DEPENDS
+    RELATIVE "${PROJECT_SOURCE_DIR}/include"
+    "${PROJECT_SOURCE_DIR}/include/memorial/*.hpp"
+)
+set(MEMORIAL_HEADER_TEST_SOURCES)
+foreach(HEADER IN LISTS MEMORIAL_PUBLIC_HEADERS)
+    string(MAKE_C_IDENTIFIER "${HEADER}" HEADER_ID)
+    set(HEADER_SOURCE
+        "${CMAKE_CURRENT_BINARY_DIR}/header_self_containment/${HEADER_ID}.cpp"
+    )
+    file(
+        GENERATE
+        OUTPUT "${HEADER_SOURCE}"
+        CONTENT "#include <${HEADER}>\n\nvoid memorial_header_${HEADER_ID}() {}\n"
+    )
+    list(APPEND MEMORIAL_HEADER_TEST_SOURCES "${HEADER_SOURCE}")
+endforeach()
+
+add_executable(
+    memorial_header_self_containment_tests
+    static/header_self_containment_main.cpp
+    ${MEMORIAL_HEADER_TEST_SOURCES}
+)
+target_link_libraries(
+    memorial_header_self_containment_tests
+    PRIVATE memorial::memorial memorial::warnings memorial::sanitizers
+)
+add_test(NAME static.header_self_containment COMMAND memorial_header_self_containment_tests)
+
 add_executable(memorial_static_tests static/library_contracts.cpp)
 target_link_libraries(memorial_static_tests PRIVATE memorial::memorial memorial::warnings memorial::sanitizers)
 add_test(NAME static.library_contracts COMMAND memorial_static_tests)
