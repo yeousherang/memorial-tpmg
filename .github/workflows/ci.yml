@@ -4,29 +4,100 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install clang-format
+        run: python -m pip install clang-format==20.1.8
+      - name: Configure
+        run: >-
+          cmake -S . -B build/format
+          -DBUILD_TESTING=OFF
+          -DMEMORIAL_BUILD_EXAMPLES=OFF
+      - name: Check formatting
+        run: cmake --build build/format --target format-check
+
   build-and-test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - name: GCC + libstdc++
+            os: ubuntu-latest
             compiler: g++
-          - os: ubuntu-latest
+            cmake_args: ""
+            install_libcxx: false
+          - name: Clang + libstdc++
+            os: ubuntu-latest
             compiler: clang++
-          - os: windows-latest
+            cmake_args: ""
+            install_libcxx: false
+          - name: Clang + libc++
+            os: ubuntu-latest
+            compiler: clang++
+            cmake_args: >-
+              -DCMAKE_CXX_FLAGS=-stdlib=libc++
+              -DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++
+            install_libcxx: true
+          - name: Apple Clang + libc++
+            os: macos-latest
+            compiler: clang++
+            cmake_args: ""
+            install_libcxx: false
+          - name: MSVC + MSVC STL
+            os: windows-latest
             compiler: cl
-          - os: macos-latest
-            compiler: clang++
-    runs-on: ${{ matrix.os }}
+            cmake_args: ""
+            install_libcxx: false
     env:
       CXX: ${{ matrix.compiler }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+      - name: Install libc++
+        if: matrix.install_libcxx
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libc++-dev libc++abi-dev
       - name: Configure
-        run: cmake -S . -B build -DMEMORIAL_WARNINGS_AS_ERRORS=ON
+        run: >-
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Debug
+          -DMEMORIAL_WARNINGS_AS_ERRORS=ON
+          ${{ matrix.cmake_args }}
       - name: Build
-        run: cmake --build build --config Debug
+        run: cmake --build build --config Debug --parallel
       - name: Test
         run: ctest --test-dir build -C Debug --output-on-failure
 
+  sanitizers:
+    name: ASan + UBSan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v6
+      - name: Configure
+        run: >-
+          cmake -S . -B build/sanitizers
+          -DCMAKE_BUILD_TYPE=Debug
+          -DMEMORIAL_WARNINGS_AS_ERRORS=ON
+          -DMEMORIAL_ENABLE_SANITIZERS=ON
+      - name: Build
+        run: cmake --build build/sanitizers --parallel
+      - name: Test
+        run: ctest --test-dir build/sanitizers --output-on-failure

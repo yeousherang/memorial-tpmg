@@ -40,6 +40,8 @@ ASan/UBSan 검증은 지원되는 Clang/GCC 환경에서 `asan` 프리셋으로 
 
 구성 단계는 컴파일러 버전 문자열만 확인하지 않는다. 실제 코드로 `std::expected`와 structural non-type template parameter 지원을 검사하며, 필요한 C++23 기능이 없으면 구성에 실패한다. 테스트 빌드는 모든 public header를 각각 독립된 번역 단위에서 컴파일해 self-containment도 확인한다.
 
+CI는 포맷, 일반 빌드·테스트, ASan/UBSan을 독립된 품질 게이트로 실행한다. 일반 테스트 매트릭스는 GCC/libstdc++, Clang/libstdc++, Clang/libc++, Apple Clang/libc++, MSVC/MSVC STL을 포함한다.
+
 런타임 단위 테스트는 GoogleTest 1.17을 사용한다. CMake는 시스템에 설치된 패키지를 우선 사용하고, 찾지 못하면 구성 단계에서 고정된 릴리스를 가져온다. 네트워크 사용을 금지하려면 GoogleTest를 먼저 설치하고 `-DMEMORIAL_FETCH_DEPENDENCIES=OFF`를 지정한다. 타입 계약은 `static_assert`, 잘못된 코드 경로는 compile-fail 테스트로 계속 검증한다.
 
 ## 핵심 원칙
