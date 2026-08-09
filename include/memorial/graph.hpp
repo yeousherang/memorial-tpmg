@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memorial/runtime/canonical_hash.hpp>
 #include <memorial/runtime/error.hpp>
 #include <memorial/runtime/event_log.hpp>
 #include <memorial/runtime/identity.hpp>
