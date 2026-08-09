@@ -3,6 +3,7 @@
 #include <memorial/meta/type_list.hpp>
 #include <memorial/schema/edge.hpp>
 #include <memorial/schema/node.hpp>
+#include <memorial/schema/relation_rules.hpp>
 
 #include <concepts>
 #include <cstddef>
@@ -38,9 +39,12 @@ template <typename Source, typename Relation, typename Target> struct edge_signa
                                           std::same_as<Target, typename Edge::target>> {};
 };
 
-template <NodeSpecList Nodes, EdgeSpecList Edges> struct graph_schema {
+template <NodeSpecList Nodes, EdgeSpecList Edges,
+          RelationRulePolicy RelationRules = unrestricted_relation_rules>
+struct graph_schema {
     using nodes = Nodes;
     using edges = Edges;
+    using relation_rules = RelationRules;
     using node_tags = meta::type_list_transform_t<node_tag, nodes>;
     using edge_signatures = meta::type_list_transform_t<edge_signature_of, edges>;
 
@@ -56,6 +60,33 @@ template <NodeSpecList Nodes, EdgeSpecList Edges> struct graph_schema {
     static_assert(meta::type_list_all_of_v<has_known_endpoints, edges>,
                   "graph_schema edge endpoints must reference declared node tags");
 
+    template <EdgeSpec Edge> struct has_allowed_layer_relation {
+      private:
+        using source_node =
+            meta::type_list_find_if_t<node_tag_matches<typename Edge::source>::template predicate,
+                                      nodes>;
+        using target_node =
+            meta::type_list_find_if_t<node_tag_matches<typename Edge::target>::template predicate,
+                                      nodes>;
+
+        [[nodiscard]] static consteval bool evaluate() {
+            if constexpr (std::same_as<source_node, meta::type_list_not_found> ||
+                          std::same_as<target_node, meta::type_list_not_found>) {
+                return true;
+            } else {
+                return relation_rules::template allows<typename Edge::relation,
+                                                       typename source_node::layer,
+                                                       typename target_node::layer>;
+            }
+        }
+
+      public:
+        static constexpr bool value = evaluate();
+    };
+
+    static_assert(meta::type_list_all_of_v<has_allowed_layer_relation, edges>,
+                  "graph_schema edge violates its relation layer rules");
+
     static constexpr std::size_t node_count = meta::type_list_size_v<nodes>;
     static constexpr std::size_t edge_count = meta::type_list_size_v<edges>;
 
@@ -70,8 +101,8 @@ template <NodeSpecList Nodes, EdgeSpecList Edges> struct graph_schema {
 
 template <typename Type> struct is_graph_schema : std::false_type {};
 
-template <NodeSpecList Nodes, EdgeSpecList Edges>
-struct is_graph_schema<graph_schema<Nodes, Edges>> : std::true_type {};
+template <NodeSpecList Nodes, EdgeSpecList Edges, RelationRulePolicy RelationRules>
+struct is_graph_schema<graph_schema<Nodes, Edges, RelationRules>> : std::true_type {};
 
 template <typename Type>
 inline constexpr bool is_graph_schema_v = is_graph_schema<std::remove_cvref_t<Type>>::value;

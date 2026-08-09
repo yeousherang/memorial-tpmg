@@ -82,6 +82,13 @@ target_link_libraries(
 )
 add_test(NAME static.graph_schema COMMAND memorial_graph_schema_tests)
 
+add_executable(memorial_relation_rules_tests static/relation_rules.cpp)
+target_link_libraries(
+    memorial_relation_rules_tests
+    PRIVATE memorial::memorial memorial::warnings memorial::sanitizers
+)
+add_test(NAME static.relation_rules COMMAND memorial_relation_rules_tests)
+
 add_executable(memorial_unit_tests unit/strong_id_test.cpp unit/version_test.cpp)
 target_link_libraries(
     memorial_unit_tests
@@ -157,4 +164,16 @@ memorial_add_compile_fail_test(
     duplicate_schema_edge.cpp
     23
     "graph_schema edge signatures must be unique"
+)
+memorial_add_compile_fail_test(
+    invalid_layer_relation
+    invalid_layer_relation.cpp
+    23
+    "graph_schema edge violates its relation layer rules"
+)
+memorial_add_compile_fail_test(
+    duplicate_relation_rule
+    duplicate_relation_rule.cpp
+    23
+    "relation rule signatures must be unique"
 )
