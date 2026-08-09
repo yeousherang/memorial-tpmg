@@ -22,10 +22,9 @@ concept AppendableWith =
 static_assert(std::same_as<store::id_type, person::id_type>);
 static_assert(std::same_as<decltype(std::declval<store&>().column<"name">().values),
                            std::vector<std::string>>);
-static_assert(
-    std::same_as<decltype(std::declval<const store&>().property<"confidence">(
-                     std::declval<store::id_type>())),
-                 std::expected<std::reference_wrapper<const float>, memorial::storage_error>>);
+static_assert(std::same_as<decltype(std::declval<const store&>().property<"confidence">(
+                               std::declval<store::id_type>())),
+                           memorial::result<std::reference_wrapper<const float>>>);
 static_assert(AppendableWith<store, const char (&)[4], float>);
 static_assert(!AppendableWith<store, float, const char (&)[4]>);
 

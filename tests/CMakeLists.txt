@@ -134,9 +134,17 @@ target_link_libraries(
 )
 add_test(NAME static.node_store COMMAND memorial_node_store_tests)
 
+add_executable(memorial_runtime_types_tests static/runtime_types.cpp)
+target_link_libraries(
+    memorial_runtime_types_tests
+    PRIVATE memorial::memorial memorial::warnings memorial::sanitizers
+)
+add_test(NAME static.runtime_types COMMAND memorial_runtime_types_tests)
+
 add_executable(
     memorial_unit_tests
     unit/node_store_test.cpp
+    unit/runtime_types_test.cpp
     unit/strong_id_test.cpp
     unit/version_test.cpp
 )

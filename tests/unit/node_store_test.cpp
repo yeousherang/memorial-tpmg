@@ -55,8 +55,8 @@ TEST(NodeStore, DistinguishesInvalidAndUnknownIds) {
 
     ASSERT_FALSE(invalid);
     ASSERT_FALSE(unknown);
-    EXPECT_EQ(invalid.error(), memorial::storage_error::invalid_id);
-    EXPECT_EQ(unknown.error(), memorial::storage_error::id_not_found);
+    EXPECT_EQ(invalid.error().code(), memorial::graph_errc::invalid_id);
+    EXPECT_EQ(unknown.error().code(), memorial::graph_errc::id_not_found);
 }
 
 } // namespace

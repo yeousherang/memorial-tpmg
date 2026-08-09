@@ -1,10 +1,10 @@
 #pragma once
 
+#include <memorial/runtime/error.hpp>
 #include <memorial/schema/node.hpp>
 
 #include <concepts>
 #include <cstddef>
-#include <expected>
 #include <functional>
 #include <limits>
 #include <tuple>
@@ -12,12 +12,6 @@
 #include <vector>
 
 namespace memorial {
-
-enum class storage_error {
-    invalid_id,
-    id_not_found,
-    capacity_exceeded,
-};
 
 template <PropertySpec Property> struct property_column {
     using property = Property;
@@ -47,9 +41,9 @@ class node_store<node_spec<Tag, Layer, Properties...>> {
     template <typename... Values>
         requires(sizeof...(Values) == sizeof...(Properties)) &&
                 (std::constructible_from<typename Properties::value_type, Values &&> && ...)
-    [[nodiscard]] std::expected<id_type, storage_error> append(Values&&... values) {
+    [[nodiscard]] result<id_type> append(Values&&... values) {
         if (size_ >= static_cast<size_type>(id_type::invalid_value)) {
-            return std::unexpected(storage_error::capacity_exceeded);
+            return std::unexpected(graph_error{graph_errc::capacity_exceeded});
         }
 
         auto pending =
@@ -64,8 +58,7 @@ class node_store<node_spec<Tag, Layer, Properties...>> {
     template <meta::fixed_string Key>
         requires node_has_property_v<node_type, Key>
     [[nodiscard]] auto property(id_type id)
-        -> std::expected<std::reference_wrapper<node_property_value_t<node_type, Key>>,
-                         storage_error> {
+        -> result<std::reference_wrapper<node_property_value_t<node_type, Key>>> {
         const auto row = checked_row(id);
         if (!row) {
             return std::unexpected(row.error());
@@ -76,8 +69,7 @@ class node_store<node_spec<Tag, Layer, Properties...>> {
     template <meta::fixed_string Key>
         requires node_has_property_v<node_type, Key>
     [[nodiscard]] auto property(id_type id) const
-        -> std::expected<std::reference_wrapper<const node_property_value_t<node_type, Key>>,
-                         storage_error> {
+        -> result<std::reference_wrapper<const node_property_value_t<node_type, Key>>> {
         const auto row = checked_row(id);
         if (!row) {
             return std::unexpected(row.error());
@@ -99,13 +91,13 @@ class node_store<node_spec<Tag, Layer, Properties...>> {
     }
 
   private:
-    [[nodiscard]] std::expected<size_type, storage_error> checked_row(id_type id) const noexcept {
+    [[nodiscard]] result<size_type> checked_row(id_type id) const {
         if (!id.is_valid()) {
-            return std::unexpected(storage_error::invalid_id);
+            return std::unexpected(graph_error{graph_errc::invalid_id});
         }
         const auto row = static_cast<size_type>(id.value());
         if (row >= size_) {
-            return std::unexpected(storage_error::id_not_found);
+            return std::unexpected(graph_error{graph_errc::id_not_found});
         }
         return row;
     }
