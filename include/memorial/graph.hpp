@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memorial/storage/node_store.hpp>
+
 #include <string_view>
 
 namespace memorial {

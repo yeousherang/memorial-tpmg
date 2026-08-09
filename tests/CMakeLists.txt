@@ -127,7 +127,19 @@ target_link_libraries(
 )
 add_test(NAME static.memorial_schema COMMAND memorial_domain_schema_tests)
 
-add_executable(memorial_unit_tests unit/strong_id_test.cpp unit/version_test.cpp)
+add_executable(memorial_node_store_tests static/node_store.cpp)
+target_link_libraries(
+    memorial_node_store_tests
+    PRIVATE memorial::memorial memorial::warnings memorial::sanitizers
+)
+add_test(NAME static.node_store COMMAND memorial_node_store_tests)
+
+add_executable(
+    memorial_unit_tests
+    unit/node_store_test.cpp
+    unit/strong_id_test.cpp
+    unit/version_test.cpp
+)
 target_link_libraries(
     memorial_unit_tests
     PRIVATE memorial::memorial memorial::warnings memorial::sanitizers GTest::gtest_main
@@ -177,6 +189,7 @@ memorial_add_compile_fail_test(
 )
 memorial_add_compile_fail_test(invalid_node_property invalid_node_property.cpp 23)
 memorial_add_compile_fail_test(missing_node_property missing_node_property.cpp 23)
+memorial_add_compile_fail_test(missing_node_store_property missing_node_store_property.cpp 23)
 memorial_add_compile_fail_test(
     duplicate_edge_property
     duplicate_edge_property.cpp
