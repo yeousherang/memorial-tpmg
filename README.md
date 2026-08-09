@@ -1,5 +1,10 @@
 # Memorial TPMG
 
+[![CI](https://github.com/yeousherang/memorial-tpmg/actions/workflows/ci.yml/badge.svg)](https://github.com/yeousherang/memorial-tpmg/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
+> **Experimental pre-alpha:** 런타임 저장소와 쿼리 실행기는 아직 구현되지 않았다. API는 예고 없이 변경될 수 있으며, 이 프로젝트는 임상 또는 진단 시스템이 아니다.
+
 Memorial TPMG는 인간의 경험, 지각, 생각, 감정, 선택, 결과, 기억 및 잠재적 영향을 시간과 세계선 위에 표현하는 `Temporal Probabilistic Multilayer Graph` 라이브러리 프로젝트다.
 
 내부 표현은 트리가 아니라 시간 확률 다층 그래프이며, 트리는 실제 선택 경로를 보여주는 하나의 뷰다. 구현은 C++23을 기준으로 한다. TMP는 스키마 검증, 쿼리 계획 및 커널 특화에 사용하고, 실제 노드와 확률값은 런타임 SoA 저장소에 보관한다.
@@ -25,6 +30,8 @@ Memorial TPMG는 인간의 경험, 지각, 생각, 감정, 선택, 결과, 기�
 ## 현재 상태
 
 이 저장소는 초기 구현 단계다. C++23/CMake 프로젝트 기반, 예제, 테스트 및 compile-fail 하네스가 준비되어 있다. API와 파일 배치는 구현 과정에서 변경될 수 있으며, 중요한 변경은 ADR로 남긴다.
+
+현재 구현된 범위는 정적 스키마, strong ID, 기본 Memorial 도메인 스키마와 컴파일타임 검증이다. 런타임 SoA 저장소, 이벤트 로그, snapshot, 세계선 및 쿼리 실행은 아직 구현되지 않았다.
 
 ## 빌드 및 테스트
 
@@ -53,3 +60,11 @@ CI는 포맷, 일반 빌드·테스트, ASan/UBSan을 독립된 품질 게이트
 - 미래에 얻은 정보를 과거 상태 복원에 누출하지 않는다.
 - TMP의 대상은 데이터가 아니라 데이터의 형태, 계약 및 실행 규칙이다.
 - 런타임 성능, 컴파일 시간, 바이너리 크기를 함께 측정한다.
+
+## 기여 및 보안
+
+기여 절차는 [CONTRIBUTING.md](CONTRIBUTING.md), 커뮤니티 행동 기준은 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)를 따른다. 보안 문제나 민감한 내용은 공개 issue 대신 [SECURITY.md](SECURITY.md)의 비공개 연락처로 제보한다.
+
+## 라이선스와 저작자
+
+Copyright 2026 yeousherang. Apache License 2.0으로 배포한다. 전체 조건은 [LICENSE](LICENSE), 원 저작자 표시는 [NOTICE](NOTICE), 저자 정보는 [AUTHORS.md](AUTHORS.md)에서 확인할 수 있다.
