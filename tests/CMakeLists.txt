@@ -155,12 +155,20 @@ target_link_libraries(
 )
 add_test(NAME static.adjacency_store COMMAND memorial_adjacency_store_tests)
 
+add_executable(memorial_snapshot_tests static/snapshot.cpp)
+target_link_libraries(
+    memorial_snapshot_tests
+    PRIVATE memorial::memorial memorial::warnings memorial::sanitizers
+)
+add_test(NAME static.snapshot COMMAND memorial_snapshot_tests)
+
 add_executable(
     memorial_unit_tests
     unit/adjacency_store_test.cpp
     unit/delta_store_test.cpp
     unit/node_store_test.cpp
     unit/runtime_types_test.cpp
+    unit/snapshot_test.cpp
     unit/strong_id_test.cpp
     unit/version_test.cpp
 )

@@ -87,4 +87,22 @@ TEST(AdjacencyStore, RejectsEndpointsMissingFromNodeStores) {
     EXPECT_EQ(edge.error().code(), memorial::graph_errc::id_not_found);
 }
 
+TEST(AdjacencyStore, RejectsEndpointsFromDifferentWorldlines) {
+    memorial::delta_store<memorial::memorial_schema> delta;
+    const row_context context;
+    const auto experience = delta.nodes<memorial::domain::experience_tag>().append(
+        memorial::worldline_id{1U}, context.valid, context.transaction, context.source, 0.9F);
+    const auto perception = delta.nodes<memorial::domain::perception_tag>().append(
+        memorial::worldline_id{2U}, context.valid, context.transaction, context.source, 0.8F);
+    ASSERT_TRUE(experience);
+    ASSERT_TRUE(perception);
+
+    const auto edge =
+        delta.append_edge<memorial::domain::experience_tag, memorial::domain::generates_relation,
+                          memorial::domain::perception_tag>(*experience, *perception, 0.5);
+
+    ASSERT_FALSE(edge);
+    EXPECT_EQ(edge.error().code(), memorial::graph_errc::worldline_mismatch);
+}
+
 } // namespace

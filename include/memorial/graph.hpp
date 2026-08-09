@@ -7,6 +7,7 @@
 #include <memorial/storage/adjacency_store.hpp>
 #include <memorial/storage/delta_store.hpp>
 #include <memorial/storage/node_store.hpp>
+#include <memorial/storage/snapshot.hpp>
 
 #include <string_view>
 

@@ -180,6 +180,18 @@ template <GraphSchema Schema> class delta_store {
             return std::unexpected(
                 graph_error{graph_errc::id_not_found, "edge endpoint does not exist"});
         }
+        const auto source_worldline = nodes<Source>().worldline(source);
+        const auto target_worldline = nodes<Target>().worldline(target);
+        if (!source_worldline) {
+            return std::unexpected(source_worldline.error());
+        }
+        if (!target_worldline) {
+            return std::unexpected(target_worldline.error());
+        }
+        if (*source_worldline != *target_worldline) {
+            return std::unexpected(graph_error{graph_errc::worldline_mismatch,
+                                               "edge endpoints belong to different worldlines"});
+        }
         using edge_type = schema_edge_t<Source, Relation, Target, schema_type>;
         return mutable_edges<edge_type>().append(source, target, std::forward<Values>(values)...);
     }
