@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memorial/runtime/error.hpp>
+#include <memorial/runtime/event_log.hpp>
 #include <memorial/runtime/identity.hpp>
 #include <memorial/runtime/provenance.hpp>
 #include <memorial/runtime/time.hpp>
