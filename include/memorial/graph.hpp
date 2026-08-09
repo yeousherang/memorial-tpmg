@@ -4,6 +4,7 @@
 #include <memorial/runtime/error.hpp>
 #include <memorial/runtime/event_log.hpp>
 #include <memorial/runtime/identity.hpp>
+#include <memorial/runtime/memory_history.hpp>
 #include <memorial/runtime/provenance.hpp>
 #include <memorial/runtime/replay.hpp>
 #include <memorial/runtime/time.hpp>

@@ -2,6 +2,7 @@
 
 #include <memorial/id/strong_id.hpp>
 #include <memorial/runtime/event_log.hpp>
+#include <memorial/runtime/memory_history.hpp>
 #include <memorial/runtime/provenance.hpp>
 #include <memorial/runtime/time.hpp>
 
@@ -156,6 +157,22 @@ inline void canonical_hash_append(canonical_hasher& hasher, const provenance& va
     canonical_hash_append(hasher, value.kind());
     canonical_hash_append(hasher, value.source());
     canonical_hash_append(hasher, value.model_run());
+}
+
+template <StrongId MemoryId, EventPayload Value>
+    requires requires(canonical_hasher& hasher, const Value& value) {
+        canonical_hash_append(hasher, value);
+    }
+void canonical_hash_append(canonical_hasher& hasher,
+                           const memory_revision<MemoryId, Value>&
+                               revision) noexcept(noexcept(canonical_hash_append(hasher,
+                                                                                 revision.value))) {
+    hasher.append_tag("memorial.memory_revision.v1");
+    canonical_hash_append(hasher, revision.memory);
+    canonical_hash_append(hasher, revision.perspective);
+    canonical_hash_append(hasher, revision.valid.from());
+    canonical_hash_append(hasher, revision.valid.to());
+    canonical_hash_append(hasher, revision.value);
 }
 
 template <typename Value>

@@ -183,12 +183,20 @@ target_link_libraries(
 )
 add_test(NAME static.canonical_hash COMMAND memorial_canonical_hash_tests)
 
+add_executable(memorial_memory_history_tests static/memory_history.cpp)
+target_link_libraries(
+    memorial_memory_history_tests
+    PRIVATE memorial::memorial memorial::warnings memorial::sanitizers
+)
+add_test(NAME static.memory_history COMMAND memorial_memory_history_tests)
+
 add_executable(
     memorial_unit_tests
     unit/adjacency_store_test.cpp
     unit/canonical_hash_test.cpp
     unit/delta_store_test.cpp
     unit/event_log_test.cpp
+    unit/memory_history_test.cpp
     unit/node_store_test.cpp
     unit/replay_test.cpp
     unit/runtime_types_test.cpp
