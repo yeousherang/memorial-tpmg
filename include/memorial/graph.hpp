@@ -4,6 +4,7 @@
 #include <memorial/runtime/event_log.hpp>
 #include <memorial/runtime/identity.hpp>
 #include <memorial/runtime/provenance.hpp>
+#include <memorial/runtime/replay.hpp>
 #include <memorial/runtime/time.hpp>
 #include <memorial/storage/adjacency_store.hpp>
 #include <memorial/storage/delta_store.hpp>

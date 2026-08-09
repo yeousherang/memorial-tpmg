@@ -169,12 +169,20 @@ target_link_libraries(
 )
 add_test(NAME static.event_log COMMAND memorial_event_log_tests)
 
+add_executable(memorial_replay_tests static/replay.cpp)
+target_link_libraries(
+    memorial_replay_tests
+    PRIVATE memorial::memorial memorial::warnings memorial::sanitizers
+)
+add_test(NAME static.replay COMMAND memorial_replay_tests)
+
 add_executable(
     memorial_unit_tests
     unit/adjacency_store_test.cpp
     unit/delta_store_test.cpp
     unit/event_log_test.cpp
     unit/node_store_test.cpp
+    unit/replay_test.cpp
     unit/runtime_types_test.cpp
     unit/snapshot_test.cpp
     unit/strong_id_test.cpp
