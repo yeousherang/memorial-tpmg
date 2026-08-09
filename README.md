@@ -3,7 +3,7 @@
 [![CI](https://github.com/yeousherang/memorial-tpmg/actions/workflows/ci.yml/badge.svg)](https://github.com/yeousherang/memorial-tpmg/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-> **Experimental pre-alpha:** 런타임 저장소와 쿼리 실행기는 아직 구현되지 않았다. API는 예고 없이 변경될 수 있으며, 이 프로젝트는 임상 또는 진단 시스템이 아니다.
+> **Experimental pre-alpha:** 런타임 저장소는 초기 프로토타입이며 쿼리 실행기는 아직 구현되지 않았다. API는 예고 없이 변경될 수 있으며, 이 프로젝트는 임상 또는 진단 시스템이 아니다.
 
 Memorial TPMG는 인간의 경험, 지각, 생각, 감정, 선택, 결과, 기억 및 잠재적 영향을 시간과 세계선 위에 표현하는 `Temporal Probabilistic Multilayer Graph` 라이브러리 프로젝트다.
 
@@ -32,6 +32,14 @@ Memorial TPMG는 인간의 경험, 지각, 생각, 감정, 선택, 결과, 기�
 이 저장소는 초기 구현 단계다. C++23/CMake 프로젝트 기반, 예제, 테스트 및 compile-fail 하네스가 준비되어 있다. API와 파일 배치는 구현 과정에서 변경될 수 있으며, 중요한 변경은 ADR로 남긴다.
 
 현재 구현된 범위는 정적 스키마, strong ID, 기본 Memorial 도메인 스키마, 컴파일타임 검증, 런타임 ID·시간·provenance 타입, append-only typed node delta, relation별 양방향 adjacency와 불변 generation snapshot이다. 이벤트 로그, 세계선 분기 및 쿼리 실행은 아직 구현되지 않았다.
+
+의사결정 에피소드 통합 예제는 다음과 같이 실행한다.
+
+```sh
+./build/dev/examples/memorial_decision_episode
+```
+
+예제는 경험·지각·생각과 결정·행동·결과·기억을 삽입한 뒤, 불변 snapshot에서 선택된 행동과 결과 confidence를 조회한다.
 
 ## 빌드 및 테스트
 
