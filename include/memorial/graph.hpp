@@ -4,6 +4,7 @@
 #include <memorial/runtime/identity.hpp>
 #include <memorial/runtime/provenance.hpp>
 #include <memorial/runtime/time.hpp>
+#include <memorial/storage/delta_store.hpp>
 #include <memorial/storage/node_store.hpp>
 
 #include <string_view>

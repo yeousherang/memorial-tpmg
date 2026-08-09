@@ -141,8 +141,16 @@ target_link_libraries(
 )
 add_test(NAME static.runtime_types COMMAND memorial_runtime_types_tests)
 
+add_executable(memorial_delta_store_tests static/delta_store.cpp)
+target_link_libraries(
+    memorial_delta_store_tests
+    PRIVATE memorial::memorial memorial::warnings memorial::sanitizers
+)
+add_test(NAME static.delta_store COMMAND memorial_delta_store_tests)
+
 add_executable(
     memorial_unit_tests
+    unit/delta_store_test.cpp
     unit/node_store_test.cpp
     unit/runtime_types_test.cpp
     unit/strong_id_test.cpp
@@ -198,6 +206,7 @@ memorial_add_compile_fail_test(
 memorial_add_compile_fail_test(invalid_node_property invalid_node_property.cpp 23)
 memorial_add_compile_fail_test(missing_node_property missing_node_property.cpp 23)
 memorial_add_compile_fail_test(missing_node_store_property missing_node_store_property.cpp 23)
+memorial_add_compile_fail_test(unknown_delta_node unknown_delta_node.cpp 23)
 memorial_add_compile_fail_test(
     duplicate_edge_property
     duplicate_edge_property.cpp
