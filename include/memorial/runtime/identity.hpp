@@ -11,11 +11,13 @@ struct generation_id_tag {};
 struct model_run_id_tag {};
 struct event_sequence_tag {};
 struct perspective_id_tag {};
+struct intervention_id_tag {};
 
 using worldline_id = strong_id<worldline_id_tag, std::uint64_t>;
 using generation_id = strong_id<generation_id_tag, std::uint64_t>;
 using model_run_id = strong_id<model_run_id_tag, std::uint64_t>;
 using event_sequence = strong_id<event_sequence_tag, std::uint64_t>;
 using perspective_id = strong_id<perspective_id_tag, std::uint64_t>;
+using intervention_id = strong_id<intervention_id_tag, std::uint64_t>;
 
 } // namespace memorial

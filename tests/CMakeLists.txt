@@ -190,6 +190,13 @@ target_link_libraries(
 )
 add_test(NAME static.memory_history COMMAND memorial_memory_history_tests)
 
+add_executable(memorial_worldline_tests static/worldline.cpp)
+target_link_libraries(
+    memorial_worldline_tests
+    PRIVATE memorial::memorial memorial::warnings memorial::sanitizers
+)
+add_test(NAME static.worldline COMMAND memorial_worldline_tests)
+
 add_executable(
     memorial_unit_tests
     unit/adjacency_store_test.cpp
@@ -203,6 +210,7 @@ add_executable(
     unit/snapshot_test.cpp
     unit/strong_id_test.cpp
     unit/version_test.cpp
+    unit/worldline_test.cpp
 )
 target_link_libraries(
     memorial_unit_tests

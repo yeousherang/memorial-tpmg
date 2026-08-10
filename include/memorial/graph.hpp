@@ -8,6 +8,7 @@
 #include <memorial/runtime/provenance.hpp>
 #include <memorial/runtime/replay.hpp>
 #include <memorial/runtime/time.hpp>
+#include <memorial/runtime/worldline.hpp>
 #include <memorial/storage/adjacency_store.hpp>
 #include <memorial/storage/delta_store.hpp>
 #include <memorial/storage/node_store.hpp>
