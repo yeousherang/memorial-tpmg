@@ -31,7 +31,7 @@ Memorial TPMG는 인간의 경험, 지각, 생각, 감정, 선택, 결과, 기�
 
 이 저장소는 초기 구현 단계다. C++23/CMake 프로젝트 기반, 예제, 테스트 및 compile-fail 하네스가 준비되어 있다. API와 파일 배치는 구현 과정에서 변경될 수 있으며, 중요한 변경은 ADR로 남긴다.
 
-현재 구현된 범위는 정적 스키마, strong ID, 기본 Memorial 도메인 스키마, 컴파일타임 검증, 런타임 ID·시간·provenance 타입, append-only typed node delta, relation별 양방향 adjacency, 불변 generation snapshot, sequence 기반 이벤트 로그, checkpoint/replay, canonical state/log hash, 이중 시간 memory reinterpretation, worldline registry/fork와 copy-on-write branch snapshot이다. 정적 쿼리 DSL과 실행기는 아직 구현되지 않았다.
+현재 구현된 범위는 정적 스키마, strong ID, 기본 Memorial 도메인 스키마, 컴파일타임 검증, 런타임 ID·시간·provenance 타입, append-only typed node delta, relation별 양방향 adjacency, 불변 generation snapshot, sequence 기반 이벤트 로그, checkpoint/replay, canonical state/log hash, 이중 시간 memory reinterpretation, worldline registry/fork, copy-on-write branch snapshot과 정적 쿼리 AST DSL이다. 쿼리 최적화와 실행기는 아직 구현되지 않았다.
 
 의사결정 에피소드 통합 예제는 다음과 같이 실행한다.
 

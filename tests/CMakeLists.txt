@@ -197,6 +197,13 @@ target_link_libraries(
 )
 add_test(NAME static.worldline COMMAND memorial_worldline_tests)
 
+add_executable(memorial_query_dsl_tests static/query_dsl.cpp)
+target_link_libraries(
+    memorial_query_dsl_tests
+    PRIVATE memorial::memorial memorial::warnings memorial::sanitizers
+)
+add_test(NAME static.query_dsl COMMAND memorial_query_dsl_tests)
+
 add_executable(
     memorial_unit_tests
     unit/adjacency_store_test.cpp
@@ -205,6 +212,7 @@ add_executable(
     unit/event_log_test.cpp
     unit/memory_history_test.cpp
     unit/node_store_test.cpp
+    unit/query_dsl_test.cpp
     unit/replay_test.cpp
     unit/runtime_types_test.cpp
     unit/snapshot_test.cpp
@@ -302,4 +310,22 @@ memorial_add_compile_fail_test(
     duplicate_relation_rule.cpp
     23
     "relation rule signatures must be unique"
+)
+memorial_add_compile_fail_test(
+    query_unknown_property
+    query_unknown_property.cpp
+    23
+    "query predicate property is unavailable"
+)
+memorial_add_compile_fail_test(
+    query_invalid_traversal
+    query_invalid_traversal.cpp
+    23
+    "query traversal relation is not valid"
+)
+memorial_add_compile_fail_test(
+    query_filtered_after_projection
+    query_filtered_after_projection.cpp
+    23
+    "query predicate property is unavailable"
 )
