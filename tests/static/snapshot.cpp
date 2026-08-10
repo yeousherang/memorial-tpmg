@@ -9,6 +9,8 @@ using snapshot_type = memorial::snapshot<memorial::memorial_schema>;
 using thought_id = memorial::node_id<memorial::domain::thought_tag>;
 
 static_assert(std::copy_constructible<snapshot_type>);
+static_assert(std::same_as<decltype(std::declval<const snapshot_type&>().make_branch_delta()),
+                           memorial::delta_store<memorial::memorial_schema>>);
 static_assert(std::same_as<decltype(std::declval<const snapshot_type&>()
                                         .property<memorial::domain::thought_tag, "confidence">(
                                             std::declval<thought_id>())),

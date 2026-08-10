@@ -28,14 +28,58 @@ template <GraphSchema Schema> class snapshot {
             return std::unexpected(
                 graph_error{graph_errc::invalid_id, "snapshot worldline ID must be valid"});
         }
-        return snapshot{generation, worldline, valid_at, known_at,
-                        std::make_shared<const delta_store<schema_type>>(std::move(delta))};
+        return snapshot{generation,
+                        worldline,
+                        valid_at,
+                        known_at,
+                        std::make_shared<const delta_store<schema_type>>(std::move(delta)),
+                        {}};
+    }
+
+    [[nodiscard]] delta_store<schema_type> make_branch_delta() const {
+        return delta_store<schema_type>::branch_from(*this);
+    }
+
+    [[nodiscard]] static result<snapshot>
+    publish_branch(const snapshot& parent, generation_id generation, worldline_id worldline,
+                   timestamp valid_at, timestamp known_at, delta_store<schema_type>&& delta) {
+        if (!generation.is_valid() || !worldline.is_valid()) {
+            return std::unexpected(graph_error{graph_errc::invalid_id});
+        }
+        if (worldline == parent.worldline()) {
+            return std::unexpected(
+                graph_error{graph_errc::conflict, "branch must use a distinct worldline ID"});
+        }
+        if (!parent.branch_bases_match(delta)) {
+            return std::unexpected(graph_error{
+                graph_errc::conflict, "branch delta was not based on the parent snapshot"});
+        }
+        return snapshot{generation,
+                        worldline,
+                        valid_at,
+                        known_at,
+                        std::make_shared<const delta_store<schema_type>>(std::move(delta)),
+                        std::make_shared<const snapshot>(parent)};
     }
 
     [[nodiscard]] generation_id generation() const noexcept { return generation_; }
     [[nodiscard]] worldline_id worldline() const noexcept { return worldline_; }
     [[nodiscard]] timestamp valid_at() const noexcept { return valid_at_; }
     [[nodiscard]] timestamp known_at() const noexcept { return known_at_; }
+    [[nodiscard]] bool is_branch() const noexcept { return static_cast<bool>(parent_); }
+    [[nodiscard]] const snapshot* parent() const noexcept { return parent_.get(); }
+
+    template <typename Tag>
+        requires schema_has_node_v<Tag, schema_type>
+    [[nodiscard]] std::size_t node_extent() const noexcept {
+        return data_->template node_extent<Tag>();
+    }
+
+    template <typename Source, typename Relation, typename Target>
+        requires schema_has_edge_v<Source, Relation, Target, schema_type>
+    [[nodiscard]] std::size_t edge_extent() const noexcept {
+        return data_->template edge_extent<Source, Relation, Target>();
+    }
 
     template <typename Tag>
         requires schema_has_node_v<Tag, schema_type>
@@ -60,7 +104,10 @@ template <GraphSchema Schema> class snapshot {
         if (!visible) {
             return std::unexpected(visible.error());
         }
-        return data_->template nodes<Tag>().template property<Key>(id);
+        if (data_->template nodes<Tag>().contains(id)) {
+            return data_->template nodes<Tag>().template property<Key>(id);
+        }
+        return parent_->template property<Tag, Key>(id);
     }
 
     template <typename Source, typename Relation, typename Target>
@@ -75,6 +122,19 @@ template <GraphSchema Schema> class snapshot {
         using edge_store_type =
             adjacency_store<schema_edge_t<Source, Relation, Target, schema_type>>;
         std::vector<typename edge_store_type::id_type> visible_edges;
+        if (parent_) {
+            const auto inherited_source = parent_->template contains<Source>(source);
+            if (!inherited_source) {
+                return std::unexpected(inherited_source.error());
+            }
+            if (*inherited_source) {
+                const auto inherited = parent_->template outgoing<Source, Relation, Target>(source);
+                if (!inherited) {
+                    return std::unexpected(inherited.error());
+                }
+                visible_edges.insert(visible_edges.end(), inherited->begin(), inherited->end());
+            }
+        }
         const auto& edges = data_->template edges<Source, Relation, Target>();
         for (const auto edge : edges.outgoing(source)) {
             const auto target = edges.target(edge);
@@ -104,6 +164,19 @@ template <GraphSchema Schema> class snapshot {
         using edge_store_type =
             adjacency_store<schema_edge_t<Source, Relation, Target, schema_type>>;
         std::vector<typename edge_store_type::id_type> visible_edges;
+        if (parent_) {
+            const auto inherited_target = parent_->template contains<Target>(target);
+            if (!inherited_target) {
+                return std::unexpected(inherited_target.error());
+            }
+            if (*inherited_target) {
+                const auto inherited = parent_->template incoming<Source, Relation, Target>(target);
+                if (!inherited) {
+                    return std::unexpected(inherited.error());
+                }
+                visible_edges.insert(visible_edges.end(), inherited->begin(), inherited->end());
+            }
+        }
         const auto& edges = data_->template edges<Source, Relation, Target>();
         for (const auto edge : edges.incoming(target)) {
             const auto source = edges.source(edge);
@@ -123,12 +196,19 @@ template <GraphSchema Schema> class snapshot {
 
   private:
     snapshot(generation_id generation, worldline_id worldline, timestamp valid_at,
-             timestamp known_at, std::shared_ptr<const delta_store<schema_type>> data) noexcept
+             timestamp known_at, std::shared_ptr<const delta_store<schema_type>> data,
+             std::shared_ptr<const snapshot> parent) noexcept
         : generation_{generation}, worldline_{worldline}, valid_at_{valid_at}, known_at_{known_at},
-          data_{std::move(data)} {}
+          data_{std::move(data)}, parent_{std::move(parent)} {}
 
     template <typename Tag> [[nodiscard]] result<void> check_visibility(node_id<Tag> id) const {
         const auto& nodes = data_->template nodes<Tag>();
+        if (!nodes.contains(id)) {
+            if (parent_) {
+                return parent_->template check_visibility<Tag>(id);
+            }
+            return std::unexpected(graph_error{graph_errc::id_not_found});
+        }
         const auto row_worldline = nodes.worldline(id);
         if (!row_worldline) {
             return std::unexpected(row_worldline.error());
@@ -153,11 +233,36 @@ template <GraphSchema Schema> class snapshot {
         return {};
     }
 
+    template <NodeSpec... Nodes>
+    [[nodiscard]] bool node_bases_match(const delta_store<schema_type>& delta,
+                                        meta::type_list<Nodes...>) const noexcept {
+        return ((delta.template nodes<typename Nodes::tag>().id_base() ==
+                 node_extent<typename Nodes::tag>()) &&
+                ...);
+    }
+
+    template <EdgeSpec... Edges>
+    [[nodiscard]] bool edge_bases_match(const delta_store<schema_type>& delta,
+                                        meta::type_list<Edges...>) const noexcept {
+        return ((delta
+                     .template edges<typename Edges::source, typename Edges::relation,
+                                     typename Edges::target>()
+                     .id_base() == edge_extent<typename Edges::source, typename Edges::relation,
+                                               typename Edges::target>()) &&
+                ...);
+    }
+
+    [[nodiscard]] bool branch_bases_match(const delta_store<schema_type>& delta) const noexcept {
+        return node_bases_match(delta, typename schema_type::nodes{}) &&
+               edge_bases_match(delta, typename schema_type::edges{});
+    }
+
     generation_id generation_;
     worldline_id worldline_;
     timestamp valid_at_;
     timestamp known_at_;
     std::shared_ptr<const delta_store<schema_type>> data_;
+    std::shared_ptr<const snapshot> parent_;
 };
 
 } // namespace memorial

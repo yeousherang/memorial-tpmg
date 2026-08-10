@@ -21,9 +21,14 @@ template <NodeSpec Node> class delta_node_store {
     using id_type = typename node_type::id_type;
     using size_type = std::size_t;
 
+    delta_node_store() = default;
+    explicit delta_node_store(size_type id_base) noexcept : nodes_{id_base} {}
+
     [[nodiscard]] size_type size() const noexcept { return nodes_.size(); }
     [[nodiscard]] bool empty() const noexcept { return nodes_.empty(); }
     [[nodiscard]] bool contains(id_type id) const noexcept { return nodes_.contains(id); }
+    [[nodiscard]] size_type id_base() const noexcept { return nodes_.id_base(); }
+    [[nodiscard]] size_type extent() const noexcept { return nodes_.extent(); }
 
     template <typename... Values>
         requires requires(node_store<node_type>& store, Values&&... values) {
@@ -91,7 +96,7 @@ template <NodeSpec Node> class delta_node_store {
         if (!nodes_.contains(id)) {
             return std::unexpected(graph_error{graph_errc::id_not_found});
         }
-        return static_cast<size_type>(id.value());
+        return static_cast<size_type>(id.value()) - nodes_.id_base();
     }
 
     template <size_type Index>
@@ -145,6 +150,13 @@ template <GraphSchema Schema> class delta_store {
   public:
     using schema_type = Schema;
 
+    template <typename Parent> [[nodiscard]] static delta_store branch_from(const Parent& parent) {
+        delta_store result;
+        result.initialize_node_bases(parent, typename schema_type::nodes{});
+        result.initialize_edge_bases(parent, typename schema_type::edges{});
+        return result;
+    }
+
     template <typename Tag>
         requires schema_has_node_v<Tag, schema_type>
     [[nodiscard]] auto nodes() noexcept -> delta_node_store<schema_node_t<Tag, schema_type>>& {
@@ -158,12 +170,24 @@ template <GraphSchema Schema> class delta_store {
         return std::get<delta_node_store<schema_node_t<Tag, schema_type>>>(node_stores_.values);
     }
 
+    template <typename Tag>
+        requires schema_has_node_v<Tag, schema_type>
+    [[nodiscard]] std::size_t node_extent() const noexcept {
+        return nodes<Tag>().extent();
+    }
+
     template <typename Source, typename Relation, typename Target>
         requires schema_has_edge_v<Source, Relation, Target, schema_type>
     [[nodiscard]] auto edges() const noexcept
         -> const adjacency_store<schema_edge_t<Source, Relation, Target, schema_type>>& {
         using edge_type = schema_edge_t<Source, Relation, Target, schema_type>;
         return std::get<adjacency_store<edge_type>>(edge_stores_.values);
+    }
+
+    template <typename Source, typename Relation, typename Target>
+        requires schema_has_edge_v<Source, Relation, Target, schema_type>
+    [[nodiscard]] std::size_t edge_extent() const noexcept {
+        return edges<Source, Relation, Target>().extent();
     }
 
     template <typename Source, typename Relation, typename Target, typename... Values>
@@ -176,27 +200,48 @@ template <GraphSchema Schema> class delta_store {
     [[nodiscard]] auto
     append_edge(node_id<Source> source, node_id<Target> target, Values&&... values) -> result<
         typename adjacency_store<schema_edge_t<Source, Relation, Target, schema_type>>::id_type> {
-        if (!nodes<Source>().contains(source) || !nodes<Target>().contains(target)) {
+        if (!endpoint_exists<Source>(source) || !endpoint_exists<Target>(target)) {
             return std::unexpected(
                 graph_error{graph_errc::id_not_found, "edge endpoint does not exist"});
         }
-        const auto source_worldline = nodes<Source>().worldline(source);
-        const auto target_worldline = nodes<Target>().worldline(target);
-        if (!source_worldline) {
-            return std::unexpected(source_worldline.error());
-        }
-        if (!target_worldline) {
-            return std::unexpected(target_worldline.error());
-        }
-        if (*source_worldline != *target_worldline) {
-            return std::unexpected(graph_error{graph_errc::worldline_mismatch,
-                                               "edge endpoints belong to different worldlines"});
+        if (nodes<Source>().contains(source) && nodes<Target>().contains(target)) {
+            const auto source_worldline = nodes<Source>().worldline(source);
+            const auto target_worldline = nodes<Target>().worldline(target);
+            if (!source_worldline) {
+                return std::unexpected(source_worldline.error());
+            }
+            if (!target_worldline) {
+                return std::unexpected(target_worldline.error());
+            }
+            if (*source_worldline != *target_worldline) {
+                return std::unexpected(
+                    graph_error{graph_errc::worldline_mismatch,
+                                "edge endpoints belong to different worldlines"});
+            }
         }
         using edge_type = schema_edge_t<Source, Relation, Target, schema_type>;
         return mutable_edges<edge_type>().append(source, target, std::forward<Values>(values)...);
     }
 
   private:
+    template <typename Tag> [[nodiscard]] bool endpoint_exists(node_id<Tag> id) const noexcept {
+        return id.is_valid() && (static_cast<std::size_t>(id.value()) < nodes<Tag>().id_base() ||
+                                 nodes<Tag>().contains(id));
+    }
+
+    template <typename Parent, NodeSpec... Nodes>
+    void initialize_node_bases(const Parent& parent, meta::type_list<Nodes...>) {
+        node_stores_.values = std::tuple<delta_node_store<Nodes>...>{
+            delta_node_store<Nodes>{parent.template node_extent<typename Nodes::tag>()}...};
+    }
+
+    template <typename Parent, EdgeSpec... Edges>
+    void initialize_edge_bases(const Parent& parent, meta::type_list<Edges...>) {
+        edge_stores_.values = std::tuple<adjacency_store<Edges>...>{adjacency_store<Edges>{
+            parent.template edge_extent<typename Edges::source, typename Edges::relation,
+                                        typename Edges::target>()}...};
+    }
+
     template <EdgeSpec Edge> [[nodiscard]] auto mutable_edges() noexcept -> adjacency_store<Edge>& {
         return std::get<adjacency_store<Edge>>(edge_stores_.values);
     }
