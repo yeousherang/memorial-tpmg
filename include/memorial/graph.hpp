@@ -2,6 +2,7 @@
 
 #include <memorial/query/dsl.hpp>
 #include <memorial/query/executor.hpp>
+#include <memorial/query/optimizer.hpp>
 #include <memorial/runtime/canonical_hash.hpp>
 #include <memorial/runtime/error.hpp>
 #include <memorial/runtime/event_log.hpp>

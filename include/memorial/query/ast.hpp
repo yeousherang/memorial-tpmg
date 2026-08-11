@@ -5,6 +5,7 @@
 #include <memorial/runtime/time.hpp>
 
 #include <cstddef>
+#include <tuple>
 #include <utility>
 
 namespace memorial::query {
@@ -29,6 +30,10 @@ struct in_worldline_expr {
 
 template <typename Predicate> struct where_expr {
     Predicate predicate;
+};
+
+template <typename... Predicates> struct fused_where_expr {
+    std::tuple<Predicates...> predicates;
 };
 
 template <typename Relation, typename Target> struct traverse_expr {

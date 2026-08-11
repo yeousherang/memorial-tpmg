@@ -78,6 +78,12 @@ template <GraphSchema Schema, typename Previous, meta::fixed_string Key, typenam
     const pipeline_expr<Previous, where_expr<comparison_expr<property_ref<Key>, Operator, Value>>>&
         expression) -> result<id_list<expression_node_tag_t<Previous>>>;
 
+template <GraphSchema Schema, typename Previous, typename... Predicates>
+[[nodiscard]] auto
+evaluate(const snapshot<Schema>& graph,
+         const pipeline_expr<Previous, fused_where_expr<Predicates...>>& expression)
+    -> result<id_list<expression_node_tag_t<Previous>>>;
+
 template <GraphSchema Schema, typename Previous, typename Relation, typename Target>
 [[nodiscard]] auto
 evaluate(const snapshot<Schema>& graph,
@@ -177,6 +183,31 @@ template <typename Left, typename Right>
     return left == right;
 }
 
+template <GraphSchema Schema, typename Tag, typename Predicate>
+[[nodiscard]] result<bool> matches_predicate(const snapshot<Schema>& graph, node_id<Tag> id,
+                                             const Predicate& predicate) {
+    using traits = predicate_traits<Predicate>;
+    const auto property = graph.template property<Tag, traits::key>(id);
+    if (!property) {
+        return std::unexpected(property.error());
+    }
+    return compare(property->get(), predicate.value, typename traits::operator_type{});
+}
+
+template <std::size_t Index = 0, GraphSchema Schema, typename Tag, typename... Predicates>
+[[nodiscard]] result<bool> matches_all(const snapshot<Schema>& graph, node_id<Tag> id,
+                                       const std::tuple<Predicates...>& predicates) {
+    if constexpr (Index == sizeof...(Predicates)) {
+        return true;
+    } else {
+        const auto matches = matches_predicate(graph, id, std::get<Index>(predicates));
+        if (!matches || !*matches) {
+            return matches;
+        }
+        return matches_all<Index + 1>(graph, id, predicates);
+    }
+}
+
 template <GraphSchema Schema, typename Previous, meta::fixed_string Key, typename Operator,
           typename Value>
 [[nodiscard]] auto evaluate(
@@ -196,6 +227,30 @@ template <GraphSchema Schema, typename Previous, meta::fixed_string Key, typenam
             return std::unexpected(property.error());
         }
         if (compare(property->get(), expression.operation.predicate.value, Operator{})) {
+            output.push_back(id);
+        }
+    }
+    return output;
+}
+
+template <GraphSchema Schema, typename Previous, typename... Predicates>
+[[nodiscard]] auto
+evaluate(const snapshot<Schema>& graph,
+         const pipeline_expr<Previous, fused_where_expr<Predicates...>>& expression)
+    -> result<id_list<expression_node_tag_t<Previous>>> {
+    using tag = expression_node_tag_t<Previous>;
+    auto input = evaluate(graph, expression.previous);
+    if (!input) {
+        return std::unexpected(input.error());
+    }
+    id_list<tag> output;
+    output.reserve(input->size());
+    for (const auto id : *input) {
+        const auto matches = matches_all(graph, id, expression.operation.predicates);
+        if (!matches) {
+            return std::unexpected(matches.error());
+        }
+        if (*matches) {
             output.push_back(id);
         }
     }
