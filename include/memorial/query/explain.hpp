@@ -271,6 +271,10 @@ explain(const snapshot<Schema>& graph,
     if (!execution) {
         return std::unexpected(execution.error());
     }
+    auto source_candidates = graph.template source_candidates<source>();
+    if (!source_candidates) {
+        return std::unexpected(source_candidates.error());
+    }
 
     query_plan plan;
     plan.signature =
@@ -280,24 +284,26 @@ explain(const snapshot<Schema>& graph,
     detail::append_columns<Schema>(typename optimization_info<optimized_type>::required_columns{},
                                    plan.required_columns);
     plan.index_candidates = {
-        {index_kind::node_scan, true, true, "typed node storage is available"},
+        {index_kind::node_scan, true, false,
+         "temporal and worldline indexes provide narrower source candidates"},
         {index_kind::adjacency, true, has_traversal,
          has_traversal ? "selected for typed relation traversal" : "query has no traversal"},
-        {index_kind::valid_time, false, false, "temporal index is not implemented"},
-        {index_kind::transaction_time, false, false, "transaction-time index is not implemented"},
-        {index_kind::worldline, false, false, "worldline index is not implemented"},
+        {index_kind::valid_time, true, true, "selected for snapshot valid-time visibility"},
+        {index_kind::transaction_time, true, true,
+         "selected for snapshot transaction-time visibility"},
+        {index_kind::worldline, true, true, "selected for snapshot worldline visibility"},
         {index_kind::property, false, false, "property index is not implemented"},
     };
     plan.kernel_candidates = {
-        {kernel_kind::scalar_scan, !has_traversal,
-         has_traversal ? "used for source/filter stages" : "selected for the complete query"},
+        {kernel_kind::scalar_scan, true, "selected for remaining filter and projection stages"},
         {kernel_kind::simd_scan, false, "SIMD kernel is not implemented"},
-        {kernel_kind::sparse_index_lookup, false, "property indexes are not implemented"},
+        {kernel_kind::sparse_index_lookup, true,
+         "selected for temporal and worldline source lookup"},
         {kernel_kind::single_thread_traversal, has_traversal,
          has_traversal ? "selected for adjacency traversal" : "query has no traversal"},
         {kernel_kind::parallel_traversal, false, "parallel traversal is not implemented"},
     };
-    plan.estimated_cardinality = graph.template node_extent<source>();
+    plan.estimated_cardinality = source_candidates->size();
     plan.actual_cardinality = execution->size();
     return plan;
 }

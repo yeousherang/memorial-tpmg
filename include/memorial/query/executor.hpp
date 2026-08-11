@@ -109,20 +109,7 @@ evaluate(const snapshot<Schema>& graph,
 template <GraphSchema Schema, typename Tag>
 [[nodiscard]] result<id_list<Tag>> evaluate(const snapshot<Schema>& graph,
                                             const source_expr<Tag>&) {
-    id_list<Tag> ids;
-    const auto extent = graph.template node_extent<Tag>();
-    ids.reserve(extent);
-    for (std::size_t raw = 0; raw < extent; ++raw) {
-        const auto id = node_id<Tag>{static_cast<typename node_id<Tag>::value_type>(raw)};
-        const auto visible = graph.contains(id);
-        if (!visible) {
-            return std::unexpected(visible.error());
-        }
-        if (*visible) {
-            ids.push_back(id);
-        }
-    }
-    return ids;
+    return graph.template source_candidates<Tag>();
 }
 
 template <GraphSchema Schema, typename Previous>

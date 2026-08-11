@@ -74,4 +74,48 @@ TEST(DeltaStore, ReportsUnknownTypedIds) {
     EXPECT_EQ(value.error().code(), memorial::graph_errc::id_not_found);
 }
 
+TEST(DeltaStore, BuildsTemporalAndWorldlineSelectionIndices) {
+    memorial::delta_store<memorial::memorial_schema> delta;
+    auto& thoughts = delta.nodes<memorial::domain::thought_tag>();
+    const row_context context;
+    const auto later =
+        *memorial::valid_interval::make(memorial::timestamp{20ns}, memorial::timestamp{30ns});
+
+    const auto visible = thoughts.append(context.worldline, context.valid, context.transaction,
+                                         context.source, 0.7F, 0.8F);
+    const auto other_worldline = thoughts.append(memorial::worldline_id{2U}, context.valid,
+                                                 context.transaction, context.source, 0.6F, 0.7F);
+    const auto not_yet_valid =
+        thoughts.append(context.worldline, later, context.transaction, context.source, 0.5F, 0.6F);
+    ASSERT_TRUE(visible);
+    ASSERT_TRUE(other_worldline);
+    ASSERT_TRUE(not_yet_valid);
+
+    delta.build_indices();
+    const auto candidates = thoughts.indexed_candidates(
+        context.worldline, memorial::timestamp{15ns}, memorial::timestamp{35ns});
+
+    ASSERT_TRUE(candidates);
+    ASSERT_EQ(candidates->size(), 1U);
+    EXPECT_EQ(candidates->front(), *visible);
+}
+
+TEST(DeltaStore, InvalidatesSelectionIndicesAfterAppend) {
+    memorial::delta_store<memorial::memorial_schema> delta;
+    auto& thoughts = delta.nodes<memorial::domain::thought_tag>();
+    const row_context context;
+    ASSERT_TRUE(thoughts.append(context.worldline, context.valid, context.transaction,
+                                context.source, 0.7F, 0.8F));
+    delta.build_indices();
+    ASSERT_TRUE(thoughts.indices_ready());
+
+    ASSERT_TRUE(thoughts.append(context.worldline, context.valid, context.transaction,
+                                context.source, 0.6F, 0.7F));
+    EXPECT_FALSE(thoughts.indices_ready());
+    const auto stale = thoughts.indexed_candidates(context.worldline, memorial::timestamp{15ns},
+                                                   memorial::timestamp{35ns});
+    ASSERT_FALSE(stale);
+    EXPECT_EQ(stale.error().code(), memorial::graph_errc::conflict);
+}
+
 } // namespace

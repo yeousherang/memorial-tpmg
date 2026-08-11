@@ -56,11 +56,52 @@ TEST(QueryExplain, ReportsOptimizedPlanColumnsCandidatesAndCardinality) {
     ASSERT_NE(adjacency, plan->index_candidates.end());
     EXPECT_TRUE(adjacency->available);
     EXPECT_TRUE(adjacency->selected);
+    const auto valid_time = std::ranges::find_if(plan->index_candidates, [](const auto& candidate) {
+        return candidate.kind == index_kind::valid_time;
+    });
+    ASSERT_NE(valid_time, plan->index_candidates.end());
+    EXPECT_TRUE(valid_time->available);
+    EXPECT_TRUE(valid_time->selected);
+    const auto sparse_lookup =
+        std::ranges::find_if(plan->kernel_candidates, [](const auto& candidate) {
+            return candidate.kind == kernel_kind::sparse_index_lookup;
+        });
+    ASSERT_NE(sparse_lookup, plan->kernel_candidates.end());
+    EXPECT_TRUE(sparse_lookup->selected);
     const auto traversal = std::ranges::find_if(plan->kernel_candidates, [](const auto& candidate) {
         return candidate.kind == kernel_kind::single_thread_traversal;
     });
     ASSERT_NE(traversal, plan->kernel_candidates.end());
     EXPECT_TRUE(traversal->selected);
+}
+
+TEST(QueryExplain, EstimatesTheIndexedSourceCandidateCount) {
+    const auto active =
+        *memorial::valid_interval::make(memorial::timestamp{10ns}, memorial::timestamp{20ns});
+    const auto future =
+        *memorial::valid_interval::make(memorial::timestamp{20ns}, memorial::timestamp{30ns});
+    const auto transaction = *memorial::transaction_interval::open_ended(memorial::timestamp{5ns});
+    const auto source = *memorial::provenance::make(memorial::provenance_kind::inferred, "model");
+    memorial::delta_store<memorial::memorial_schema> delta;
+    auto& thoughts = delta.nodes<memorial::domain::thought_tag>();
+    ASSERT_TRUE(
+        thoughts.append(memorial::worldline_id{1U}, active, transaction, source, 0.7F, 0.8F));
+    ASSERT_TRUE(
+        thoughts.append(memorial::worldline_id{2U}, active, transaction, source, 0.6F, 0.7F));
+    ASSERT_TRUE(
+        thoughts.append(memorial::worldline_id{1U}, future, transaction, source, 0.5F, 0.6F));
+    const auto graph = memorial::snapshot<memorial::memorial_schema>::publish(
+        memorial::generation_id{3U}, memorial::worldline_id{1U}, memorial::timestamp{15ns},
+        memorial::timestamp{10ns}, std::move(delta));
+    ASSERT_TRUE(graph);
+
+    const auto plan =
+        explain(*graph, from<memorial::memorial_schema, memorial::domain::thought_node>());
+
+    ASSERT_TRUE(plan);
+    EXPECT_EQ(graph->node_extent<memorial::domain::thought_tag>(), 3U);
+    EXPECT_EQ(plan->estimated_cardinality, 1U);
+    EXPECT_EQ(plan->actual_cardinality, 1U);
 }
 
 TEST(QueryExplain, UsesStableSignatureForTheSameCompiledQueryType) {

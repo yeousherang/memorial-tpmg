@@ -7,9 +7,11 @@
 #include <memorial/storage/adjacency_store.hpp>
 #include <memorial/storage/node_store.hpp>
 
+#include <algorithm>
 #include <cstddef>
 #include <functional>
 #include <tuple>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -29,6 +31,79 @@ template <NodeSpec Node> class delta_node_store {
     [[nodiscard]] bool contains(id_type id) const noexcept { return nodes_.contains(id); }
     [[nodiscard]] size_type id_base() const noexcept { return nodes_.id_base(); }
     [[nodiscard]] size_type extent() const noexcept { return nodes_.extent(); }
+    [[nodiscard]] bool indices_ready() const noexcept { return indices_ready_; }
+
+    void build_indices() {
+        indices_ready_ = false;
+        worldline_index_.clear();
+        valid_start_index_.clear();
+        transaction_start_index_.clear();
+        valid_start_index_.reserve(size());
+        transaction_start_index_.reserve(size());
+        for (size_type row = 0; row < size(); ++row) {
+            const auto id = id_type{static_cast<typename id_type::value_type>(id_base() + row)};
+            worldline_index_[std::get<0>(metadata_)[row]].push_back(id);
+            valid_start_index_.emplace_back(std::get<1>(metadata_)[row].from(), id);
+            transaction_start_index_.emplace_back(std::get<2>(metadata_)[row].from(), id);
+        }
+        const auto by_time = [](const auto& left, const auto& right) {
+            return left.first < right.first;
+        };
+        std::ranges::sort(valid_start_index_, by_time);
+        std::ranges::sort(transaction_start_index_, by_time);
+        indices_ready_ = true;
+    }
+
+    [[nodiscard]] result<std::vector<id_type>>
+    indexed_candidates(worldline_id worldline, timestamp valid_at, timestamp known_at) const {
+        if (!indices_ready_) {
+            return std::unexpected(
+                graph_error{graph_errc::conflict, "delta selection indices are not built"});
+        }
+        const auto worldline_rows = worldline_index_.find(worldline);
+        if (worldline_rows == worldline_index_.end()) {
+            return std::vector<id_type>{};
+        }
+        const auto valid_end = std::upper_bound(
+            valid_start_index_.begin(), valid_start_index_.end(), valid_at,
+            [](timestamp point, const auto& entry) { return point < entry.first; });
+        const auto transaction_end = std::upper_bound(
+            transaction_start_index_.begin(), transaction_start_index_.end(), known_at,
+            [](timestamp point, const auto& entry) { return point < entry.first; });
+        const auto valid_count =
+            static_cast<size_type>(std::distance(valid_start_index_.begin(), valid_end));
+        const auto transaction_count = static_cast<size_type>(
+            std::distance(transaction_start_index_.begin(), transaction_end));
+
+        std::vector<id_type> result;
+        result.reserve(std::min({worldline_rows->second.size(), valid_count, transaction_count}));
+        const auto append_if_visible = [&](id_type id) {
+            const auto row = static_cast<size_type>(id.value()) - id_base();
+            if (std::get<0>(metadata_)[row] == worldline &&
+                std::get<1>(metadata_)[row].contains(valid_at) &&
+                std::get<2>(metadata_)[row].contains(known_at)) {
+                result.push_back(id);
+            }
+        };
+        if (worldline_rows->second.size() <= valid_count &&
+            worldline_rows->second.size() <= transaction_count) {
+            for (const auto id : worldline_rows->second) {
+                append_if_visible(id);
+            }
+        } else if (valid_count <= transaction_count) {
+            for (auto iterator = valid_start_index_.begin(); iterator != valid_end; ++iterator) {
+                append_if_visible(iterator->second);
+            }
+        } else {
+            for (auto iterator = transaction_start_index_.begin(); iterator != transaction_end;
+                 ++iterator) {
+                append_if_visible(iterator->second);
+            }
+        }
+        std::ranges::sort(result,
+                          [](id_type left, id_type right) { return left.value() < right.value(); });
+        return result;
+    }
 
     template <typename... Values>
         requires requires(node_store<node_type>& store, Values&&... values) {
@@ -41,6 +116,7 @@ template <NodeSpec Node> class delta_node_store {
             return std::unexpected(
                 graph_error{graph_errc::invalid_id, "delta row worldline ID must be valid"});
         }
+        indices_ready_ = false;
 
         auto pending =
             std::tuple{worldline, std::move(valid), std::move(transaction), std::move(source)};
@@ -128,6 +204,10 @@ template <NodeSpec Node> class delta_node_store {
 
     node_store<node_type> nodes_;
     metadata_columns metadata_;
+    std::unordered_map<worldline_id, std::vector<id_type>> worldline_index_;
+    std::vector<std::pair<timestamp, id_type>> valid_start_index_;
+    std::vector<std::pair<timestamp, id_type>> transaction_start_index_;
+    bool indices_ready_{};
 };
 
 namespace detail {
@@ -149,6 +229,8 @@ template <EdgeSpec... Edges> struct delta_edge_stores<meta::type_list<Edges...>>
 template <GraphSchema Schema> class delta_store {
   public:
     using schema_type = Schema;
+
+    void build_indices() { build_node_indices(typename schema_type::nodes{}); }
 
     template <typename Parent> [[nodiscard]] static delta_store branch_from(const Parent& parent) {
         delta_store result;
@@ -224,6 +306,9 @@ template <GraphSchema Schema> class delta_store {
     }
 
   private:
+    template <NodeSpec... Nodes> void build_node_indices(meta::type_list<Nodes...>) {
+        (std::get<delta_node_store<Nodes>>(node_stores_.values).build_indices(), ...);
+    }
     template <typename Tag> [[nodiscard]] bool endpoint_exists(node_id<Tag> id) const noexcept {
         return id.is_valid() && (static_cast<std::size_t>(id.value()) < nodes<Tag>().id_base() ||
                                  nodes<Tag>().contains(id));

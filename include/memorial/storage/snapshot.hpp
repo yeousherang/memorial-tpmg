@@ -28,6 +28,7 @@ template <GraphSchema Schema> class snapshot {
             return std::unexpected(
                 graph_error{graph_errc::invalid_id, "snapshot worldline ID must be valid"});
         }
+        delta.build_indices();
         return snapshot{generation,
                         worldline,
                         valid_at,
@@ -54,6 +55,7 @@ template <GraphSchema Schema> class snapshot {
             return std::unexpected(graph_error{
                 graph_errc::conflict, "branch delta was not based on the parent snapshot"});
         }
+        delta.build_indices();
         return snapshot{generation,
                         worldline,
                         valid_at,
@@ -93,6 +95,26 @@ template <GraphSchema Schema> class snapshot {
             return std::unexpected(visible.error());
         }
         return true;
+    }
+
+    template <typename Tag>
+        requires schema_has_node_v<Tag, schema_type>
+    [[nodiscard]] result<std::vector<node_id<Tag>>> source_candidates() const {
+        std::vector<node_id<Tag>> candidates;
+        if (parent_) {
+            auto inherited = parent_->template source_candidates<Tag>();
+            if (!inherited) {
+                return std::unexpected(inherited.error());
+            }
+            candidates = std::move(*inherited);
+        }
+        auto local =
+            data_->template nodes<Tag>().indexed_candidates(worldline_, valid_at_, known_at_);
+        if (!local) {
+            return std::unexpected(local.error());
+        }
+        candidates.insert(candidates.end(), local->begin(), local->end());
+        return candidates;
     }
 
     template <typename Tag, meta::fixed_string Key>
