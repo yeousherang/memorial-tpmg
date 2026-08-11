@@ -195,6 +195,11 @@ template <typename Id>
     return result;
 }
 
+[[nodiscard]] constexpr bool should_use_property_index(std::size_t estimate,
+                                                       std::size_t input_size) noexcept {
+    return static_cast<double>(estimate) < static_cast<double>(input_size) * 0.8;
+}
+
 template <GraphSchema Schema, typename Tag, typename Predicate>
 [[nodiscard]] result<bool> matches_predicate(const snapshot<Schema>& graph, node_id<Tag> id,
                                              const Predicate& predicate) {
@@ -230,12 +235,19 @@ template <std::size_t Index = 0, GraphSchema Schema, typename Tag, typename... P
         const auto& predicate = std::get<Index>(predicates);
         using predicate_type = std::remove_cvref_t<decltype(predicate)>;
         using traits = predicate_traits<predicate_type>;
-        auto indexed = graph.template property_candidates<Tag, traits::key>(
+        const auto estimate = graph.template estimate_property_candidates<Tag, traits::key>(
             predicate.value, comparison_predicate<typename traits::operator_type>{});
-        if (!indexed) {
-            return std::unexpected(indexed.error());
+        if (!estimate) {
+            return std::unexpected(estimate.error());
         }
-        input = retain_smaller_candidate_set(std::move(input), std::move(*indexed));
+        if (should_use_property_index(*estimate, input.size())) {
+            auto indexed = graph.template property_candidates<Tag, traits::key>(
+                predicate.value, comparison_predicate<typename traits::operator_type>{});
+            if (!indexed) {
+                return std::unexpected(indexed.error());
+            }
+            input = retain_smaller_candidate_set(std::move(input), std::move(*indexed));
+        }
         return apply_index_candidates<Index + 1>(graph, input, predicates);
     }
 }
@@ -251,12 +263,19 @@ template <GraphSchema Schema, typename Previous, meta::fixed_string Key, typenam
     if (!input) {
         return std::unexpected(input.error());
     }
-    auto indexed = graph.template property_candidates<tag, Key>(
+    const auto estimate = graph.template estimate_property_candidates<tag, Key>(
         expression.operation.predicate.value, comparison_predicate<Operator>{});
-    if (!indexed) {
-        return std::unexpected(indexed.error());
+    if (!estimate) {
+        return std::unexpected(estimate.error());
     }
-    *input = retain_smaller_candidate_set(std::move(*input), std::move(*indexed));
+    if (should_use_property_index(*estimate, input->size())) {
+        auto indexed = graph.template property_candidates<tag, Key>(
+            expression.operation.predicate.value, comparison_predicate<Operator>{});
+        if (!indexed) {
+            return std::unexpected(indexed.error());
+        }
+        *input = retain_smaller_candidate_set(std::move(*input), std::move(*indexed));
+    }
     id_list<tag> output;
     output.reserve(input->size());
     for (const auto id : *input) {

@@ -99,4 +99,10 @@ TEST(QueryExecutor, RejectsSnapshotSelectorMismatch) {
     EXPECT_EQ(result.error().code(), memorial::graph_errc::worldline_mismatch);
 }
 
+TEST(QueryExecutor, CostModelChoosesOnlySelectivePropertyLookups) {
+    EXPECT_TRUE(detail::should_use_property_index(2U, 10U));
+    EXPECT_FALSE(detail::should_use_property_index(8U, 10U));
+    EXPECT_FALSE(detail::should_use_property_index(10U, 10U));
+}
+
 } // namespace

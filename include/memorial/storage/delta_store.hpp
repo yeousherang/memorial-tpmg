@@ -8,10 +8,13 @@
 #include <memorial/storage/node_store.hpp>
 
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstddef>
 #include <functional>
 #include <ranges>
 #include <tuple>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -20,8 +23,19 @@ namespace memorial {
 
 namespace detail {
 
+inline constexpr std::size_t property_histogram_bucket_count = 16U;
+
+struct property_histogram {
+    std::array<std::size_t, property_histogram_bucket_count> buckets{};
+    std::size_t sampled_count{};
+    double minimum{};
+    double maximum{};
+    bool available{};
+};
+
 template <PropertySpec Property, StrongId Id> struct property_selection_index {
     std::vector<Id> rows;
+    property_histogram histogram;
 };
 
 template <meta::TypeList Properties, StrongId Id> struct property_selection_indices;
@@ -93,6 +107,43 @@ template <NodeSpec Node> class delta_node_store {
         std::ranges::sort(result,
                           [](id_type left, id_type right) { return left.value() < right.value(); });
         return result;
+    }
+
+    template <meta::fixed_string Key, typename Value, typename Predicate>
+        requires node_has_property_v<node_type, Key> &&
+                 std::predicate<Predicate, const node_property_value_t<node_type, Key>&,
+                                const Value&>
+    [[nodiscard]] result<size_type> estimate_property_candidates(const Value& value,
+                                                                 Predicate predicate) const {
+        if (!indices_ready_) {
+            return std::unexpected(
+                graph_error{graph_errc::conflict, "delta selection indices are not built"});
+        }
+        using property_type = node_property_value_t<node_type, Key>;
+        if constexpr (!std::is_arithmetic_v<property_type> || std::same_as<property_type, bool>) {
+            return size();
+        } else {
+            const auto& histogram = property_index<Key>().histogram;
+            if (!histogram.available) {
+                return size();
+            }
+            if (histogram.minimum == histogram.maximum) {
+                return std::invoke(predicate, static_cast<property_type>(histogram.minimum), value)
+                           ? histogram.sampled_count
+                           : 0U;
+            }
+            size_type estimate{};
+            const auto width = (histogram.maximum - histogram.minimum) /
+                               static_cast<double>(detail::property_histogram_bucket_count);
+            for (size_type bucket = 0; bucket < detail::property_histogram_bucket_count; ++bucket) {
+                const auto midpoint =
+                    histogram.minimum + (static_cast<double>(bucket) + 0.5) * width;
+                if (std::invoke(predicate, static_cast<property_type>(midpoint), value)) {
+                    estimate += histogram.buckets[bucket];
+                }
+            }
+            return estimate + (size() - histogram.sampled_count);
+        }
     }
 
     [[nodiscard]] result<std::vector<id_type>>
@@ -249,13 +300,55 @@ template <NodeSpec Node> class delta_node_store {
     }
 
     template <PropertySpec Property> void build_property_index() {
-        auto& rows =
-            std::get<detail::property_selection_index<Property, id_type>>(property_indices_.values)
-                .rows;
+        auto& index =
+            std::get<detail::property_selection_index<Property, id_type>>(property_indices_.values);
+        auto& rows = index.rows;
         rows.clear();
         rows.reserve(size());
         for (size_type row = 0; row < size(); ++row) {
             rows.emplace_back(id_type{static_cast<typename id_type::value_type>(id_base() + row)});
+        }
+        build_property_histogram<Property>(index.histogram);
+    }
+
+    template <PropertySpec Property>
+    void build_property_histogram(detail::property_histogram& histogram) {
+        histogram = {};
+        using value_type = typename Property::value_type;
+        if constexpr (std::is_arithmetic_v<value_type> && !std::same_as<value_type, bool>) {
+            const auto& values = nodes_.template column<Property::key>().values;
+            bool initialized{};
+            for (const auto value : values) {
+                const auto sample = static_cast<double>(value);
+                if (!std::isfinite(sample)) {
+                    continue;
+                }
+                if (!initialized) {
+                    histogram.minimum = sample;
+                    histogram.maximum = sample;
+                    initialized = true;
+                } else {
+                    histogram.minimum = std::min(histogram.minimum, sample);
+                    histogram.maximum = std::max(histogram.maximum, sample);
+                }
+                ++histogram.sampled_count;
+            }
+            histogram.available = initialized;
+            if (!initialized) {
+                return;
+            }
+            const auto range = histogram.maximum - histogram.minimum;
+            for (const auto value : values) {
+                const auto sample = static_cast<double>(value);
+                if (!std::isfinite(sample)) {
+                    continue;
+                }
+                const auto scaled = range == 0.0 ? 0.0 : (sample - histogram.minimum) / range;
+                const auto bucket = std::min(
+                    static_cast<size_type>(scaled * detail::property_histogram_bucket_count),
+                    detail::property_histogram_bucket_count - 1U);
+                ++histogram.buckets[bucket];
+            }
         }
     }
 

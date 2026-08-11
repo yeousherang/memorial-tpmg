@@ -138,4 +138,22 @@ TEST(DeltaStore, BuildsTypedPropertySelectionIndices) {
     EXPECT_EQ(candidates->front(), *strong);
 }
 
+TEST(DeltaStore, EstimatesNumericPropertySelectivityFromHistogram) {
+    memorial::delta_store<memorial::memorial_schema> delta;
+    auto& thoughts = delta.nodes<memorial::domain::thought_tag>();
+    const row_context context;
+    for (std::size_t index = 0; index < 10U; ++index) {
+        const auto activation = static_cast<float>(index) / 10.0F;
+        ASSERT_TRUE(thoughts.append(context.worldline, context.valid, context.transaction,
+                                    context.source, activation, 0.8F));
+    }
+    delta.build_indices();
+
+    const auto estimate = thoughts.estimate_property_candidates<"activation">(
+        0.75F, [](float property, float threshold) { return property > threshold; });
+
+    ASSERT_TRUE(estimate);
+    EXPECT_EQ(*estimate, 2U);
+}
+
 } // namespace

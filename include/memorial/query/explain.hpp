@@ -294,7 +294,7 @@ explain(const snapshot<Schema>& graph,
          "selected for snapshot transaction-time visibility"},
         {index_kind::worldline, true, true, "selected for snapshot worldline visibility"},
         {index_kind::property, true, has_filter,
-         has_filter ? "selected when its candidate set is narrower than the current input"
+         has_filter ? "selected when histogram cost predicts less than 80% of the current input"
                     : "query has no property filter"},
     };
     plan.kernel_candidates = {
