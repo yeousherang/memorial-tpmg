@@ -118,4 +118,24 @@ TEST(DeltaStore, InvalidatesSelectionIndicesAfterAppend) {
     EXPECT_EQ(stale.error().code(), memorial::graph_errc::conflict);
 }
 
+TEST(DeltaStore, BuildsTypedPropertySelectionIndices) {
+    memorial::delta_store<memorial::memorial_schema> delta;
+    auto& thoughts = delta.nodes<memorial::domain::thought_tag>();
+    const row_context context;
+    const auto weak = thoughts.append(context.worldline, context.valid, context.transaction,
+                                      context.source, 0.2F, 0.5F);
+    const auto strong = thoughts.append(context.worldline, context.valid, context.transaction,
+                                        context.source, 0.9F, 0.8F);
+    ASSERT_TRUE(weak);
+    ASSERT_TRUE(strong);
+    delta.build_indices();
+
+    const auto candidates = thoughts.indexed_property_candidates<"activation">(
+        0.5F, [](float property, float threshold) { return property > threshold; });
+
+    ASSERT_TRUE(candidates);
+    ASSERT_EQ(candidates->size(), 1U);
+    EXPECT_EQ(candidates->front(), *strong);
+}
+
 } // namespace

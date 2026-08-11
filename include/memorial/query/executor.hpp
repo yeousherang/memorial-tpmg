@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <tuple>
 #include <type_traits>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -170,6 +171,30 @@ template <typename Left, typename Right>
     return left == right;
 }
 
+template <typename Operator> struct comparison_predicate {
+    template <typename Left, typename Right>
+    [[nodiscard]] constexpr bool operator()(const Left& left, const Right& right) const {
+        return compare(left, right, Operator{});
+    }
+};
+
+template <typename Id>
+[[nodiscard]] std::vector<Id> retain_smaller_candidate_set(std::vector<Id> input,
+                                                           std::vector<Id> indexed) {
+    if (indexed.size() >= input.size()) {
+        return input;
+    }
+    const std::unordered_set<Id> selected{indexed.begin(), indexed.end()};
+    std::vector<Id> result;
+    result.reserve(indexed.size());
+    for (const auto id : input) {
+        if (selected.contains(id)) {
+            result.push_back(id);
+        }
+    }
+    return result;
+}
+
 template <GraphSchema Schema, typename Tag, typename Predicate>
 [[nodiscard]] result<bool> matches_predicate(const snapshot<Schema>& graph, node_id<Tag> id,
                                              const Predicate& predicate) {
@@ -195,6 +220,26 @@ template <std::size_t Index = 0, GraphSchema Schema, typename Tag, typename... P
     }
 }
 
+template <std::size_t Index = 0, GraphSchema Schema, typename Tag, typename... Predicates>
+[[nodiscard]] result<void> apply_index_candidates(const snapshot<Schema>& graph,
+                                                  id_list<Tag>& input,
+                                                  const std::tuple<Predicates...>& predicates) {
+    if constexpr (Index == sizeof...(Predicates)) {
+        return {};
+    } else {
+        const auto& predicate = std::get<Index>(predicates);
+        using predicate_type = std::remove_cvref_t<decltype(predicate)>;
+        using traits = predicate_traits<predicate_type>;
+        auto indexed = graph.template property_candidates<Tag, traits::key>(
+            predicate.value, comparison_predicate<typename traits::operator_type>{});
+        if (!indexed) {
+            return std::unexpected(indexed.error());
+        }
+        input = retain_smaller_candidate_set(std::move(input), std::move(*indexed));
+        return apply_index_candidates<Index + 1>(graph, input, predicates);
+    }
+}
+
 template <GraphSchema Schema, typename Previous, meta::fixed_string Key, typename Operator,
           typename Value>
 [[nodiscard]] auto evaluate(
@@ -206,6 +251,12 @@ template <GraphSchema Schema, typename Previous, meta::fixed_string Key, typenam
     if (!input) {
         return std::unexpected(input.error());
     }
+    auto indexed = graph.template property_candidates<tag, Key>(
+        expression.operation.predicate.value, comparison_predicate<Operator>{});
+    if (!indexed) {
+        return std::unexpected(indexed.error());
+    }
+    *input = retain_smaller_candidate_set(std::move(*input), std::move(*indexed));
     id_list<tag> output;
     output.reserve(input->size());
     for (const auto id : *input) {
@@ -229,6 +280,10 @@ evaluate(const snapshot<Schema>& graph,
     auto input = evaluate(graph, expression.previous);
     if (!input) {
         return std::unexpected(input.error());
+    }
+    const auto indexed = apply_index_candidates(graph, *input, expression.operation.predicates);
+    if (!indexed) {
+        return std::unexpected(indexed.error());
     }
     id_list<tag> output;
     output.reserve(input->size());

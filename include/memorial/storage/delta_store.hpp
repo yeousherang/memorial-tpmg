@@ -10,12 +10,28 @@
 #include <algorithm>
 #include <cstddef>
 #include <functional>
+#include <ranges>
 #include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
 namespace memorial {
+
+namespace detail {
+
+template <PropertySpec Property, StrongId Id> struct property_selection_index {
+    std::vector<Id> rows;
+};
+
+template <meta::TypeList Properties, StrongId Id> struct property_selection_indices;
+
+template <PropertySpec... Properties, StrongId Id>
+struct property_selection_indices<meta::type_list<Properties...>, Id> {
+    std::tuple<property_selection_index<Properties, Id>...> values;
+};
+
+} // namespace detail
 
 template <NodeSpec Node> class delta_node_store {
   public:
@@ -51,7 +67,32 @@ template <NodeSpec Node> class delta_node_store {
         };
         std::ranges::sort(valid_start_index_, by_time);
         std::ranges::sort(transaction_start_index_, by_time);
+        build_property_indices(typename node_type::properties{});
         indices_ready_ = true;
+    }
+
+    template <meta::fixed_string Key, typename Value, typename Predicate>
+        requires node_has_property_v<node_type, Key> &&
+                 std::predicate<Predicate, const node_property_value_t<node_type, Key>&,
+                                const Value&>
+    [[nodiscard]] result<std::vector<id_type>>
+    indexed_property_candidates(const Value& value, Predicate predicate) const {
+        if (!indices_ready_) {
+            return std::unexpected(
+                graph_error{graph_errc::conflict, "delta selection indices are not built"});
+        }
+        const auto& rows = property_index<Key>().rows;
+        const auto& values = nodes_.template column<Key>().values;
+        std::vector<id_type> result;
+        for (const auto id : rows) {
+            const auto row = static_cast<size_type>(id.value()) - id_base();
+            if (std::invoke(predicate, values[row], value)) {
+                result.push_back(id);
+            }
+        }
+        std::ranges::sort(result,
+                          [](id_type left, id_type right) { return left.value() < right.value(); });
+        return result;
     }
 
     [[nodiscard]] result<std::vector<id_type>>
@@ -202,11 +243,34 @@ template <NodeSpec Node> class delta_node_store {
         std::apply([](auto&... columns) { (columns.pop_back(), ...); }, metadata_);
     }
 
+    template <PropertySpec... Properties>
+    void build_property_indices(meta::type_list<Properties...>) {
+        (build_property_index<Properties>(), ...);
+    }
+
+    template <PropertySpec Property> void build_property_index() {
+        auto& rows =
+            std::get<detail::property_selection_index<Property, id_type>>(property_indices_.values)
+                .rows;
+        rows.clear();
+        rows.reserve(size());
+        for (size_type row = 0; row < size(); ++row) {
+            rows.emplace_back(id_type{static_cast<typename id_type::value_type>(id_base() + row)});
+        }
+    }
+
+    template <meta::fixed_string Key> [[nodiscard]] const auto& property_index() const noexcept {
+        using property = node_property_t<node_type, Key>;
+        return std::get<detail::property_selection_index<property, id_type>>(
+            property_indices_.values);
+    }
+
     node_store<node_type> nodes_;
     metadata_columns metadata_;
     std::unordered_map<worldline_id, std::vector<id_type>> worldline_index_;
     std::vector<std::pair<timestamp, id_type>> valid_start_index_;
     std::vector<std::pair<timestamp, id_type>> transaction_start_index_;
+    detail::property_selection_indices<typename node_type::properties, id_type> property_indices_;
     bool indices_ready_{};
 };
 

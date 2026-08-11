@@ -68,6 +68,12 @@ TEST(QueryExplain, ReportsOptimizedPlanColumnsCandidatesAndCardinality) {
         });
     ASSERT_NE(sparse_lookup, plan->kernel_candidates.end());
     EXPECT_TRUE(sparse_lookup->selected);
+    const auto property = std::ranges::find_if(plan->index_candidates, [](const auto& candidate) {
+        return candidate.kind == index_kind::property;
+    });
+    ASSERT_NE(property, plan->index_candidates.end());
+    EXPECT_TRUE(property->available);
+    EXPECT_TRUE(property->selected);
     const auto traversal = std::ranges::find_if(plan->kernel_candidates, [](const auto& candidate) {
         return candidate.kind == kernel_kind::single_thread_traversal;
     });

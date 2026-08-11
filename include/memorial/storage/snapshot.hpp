@@ -117,6 +117,36 @@ template <GraphSchema Schema> class snapshot {
         return candidates;
     }
 
+    template <typename Tag, meta::fixed_string Key, typename Value, typename Predicate>
+        requires schema_has_node_v<Tag, schema_type> &&
+                 node_has_property_v<schema_node_t<Tag, schema_type>, Key>
+    [[nodiscard]] result<std::vector<node_id<Tag>>> property_candidates(const Value& value,
+                                                                        Predicate predicate) const {
+        std::vector<node_id<Tag>> candidates;
+        if (parent_) {
+            auto inherited = parent_->template property_candidates<Tag, Key>(value, predicate);
+            if (!inherited) {
+                return std::unexpected(inherited.error());
+            }
+            candidates = std::move(*inherited);
+        }
+        auto local = data_->template nodes<Tag>().template indexed_property_candidates<Key>(
+            value, predicate);
+        if (!local) {
+            return std::unexpected(local.error());
+        }
+        for (const auto id : *local) {
+            const auto visible = contains<Tag>(id);
+            if (!visible) {
+                return std::unexpected(visible.error());
+            }
+            if (*visible) {
+                candidates.push_back(id);
+            }
+        }
+        return candidates;
+    }
+
     template <typename Tag, meta::fixed_string Key>
         requires schema_has_node_v<Tag, schema_type> &&
                  node_has_property_v<schema_node_t<Tag, schema_type>, Key>

@@ -266,6 +266,7 @@ explain(const snapshot<Schema>& graph,
     using optimized_type = decltype(optimized);
     using source = typename detail::source_node_tag<Expression>::type;
     constexpr auto has_traversal = optimization_info<optimized_type>::traversal_count != 0U;
+    constexpr auto has_filter = optimization_info<optimized_type>::filter_count != 0U;
 
     auto execution = execute(graph, optimized);
     if (!execution) {
@@ -292,13 +293,16 @@ explain(const snapshot<Schema>& graph,
         {index_kind::transaction_time, true, true,
          "selected for snapshot transaction-time visibility"},
         {index_kind::worldline, true, true, "selected for snapshot worldline visibility"},
-        {index_kind::property, false, false, "property index is not implemented"},
+        {index_kind::property, true, has_filter,
+         has_filter ? "selected when its candidate set is narrower than the current input"
+                    : "query has no property filter"},
     };
     plan.kernel_candidates = {
         {kernel_kind::scalar_scan, true, "selected for remaining filter and projection stages"},
         {kernel_kind::simd_scan, false, "SIMD kernel is not implemented"},
         {kernel_kind::sparse_index_lookup, true,
-         "selected for temporal and worldline source lookup"},
+         has_filter ? "selected for temporal, worldline, and property lookup"
+                    : "selected for temporal and worldline source lookup"},
         {kernel_kind::single_thread_traversal, has_traversal,
          has_traversal ? "selected for adjacency traversal" : "query has no traversal"},
         {kernel_kind::parallel_traversal, false, "parallel traversal is not implemented"},
