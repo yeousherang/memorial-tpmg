@@ -194,6 +194,21 @@ template <GraphSchema Schema> class snapshot {
         return visible_edges;
     }
 
+    template <typename Source, typename Relation, typename Target>
+        requires schema_has_edge_v<Source, Relation, Target, schema_type>
+    [[nodiscard]] auto edge_target(
+        typename adjacency_store<schema_edge_t<Source, Relation, Target, schema_type>>::id_type
+            edge) const -> result<node_id<Target>> {
+        const auto& edges = data_->template edges<Source, Relation, Target>();
+        if (edges.contains(edge)) {
+            return edges.target(edge);
+        }
+        if (parent_) {
+            return parent_->template edge_target<Source, Relation, Target>(edge);
+        }
+        return std::unexpected(graph_error{graph_errc::id_not_found});
+    }
+
   private:
     snapshot(generation_id generation, worldline_id worldline, timestamp valid_at,
              timestamp known_at, std::shared_ptr<const delta_store<schema_type>> data,

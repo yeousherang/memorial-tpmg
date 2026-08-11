@@ -204,6 +204,13 @@ target_link_libraries(
 )
 add_test(NAME static.query_dsl COMMAND memorial_query_dsl_tests)
 
+add_executable(memorial_query_executor_tests static/query_executor.cpp)
+target_link_libraries(
+    memorial_query_executor_tests
+    PRIVATE memorial::memorial memorial::warnings memorial::sanitizers
+)
+add_test(NAME static.query_executor COMMAND memorial_query_executor_tests)
+
 add_executable(
     memorial_unit_tests
     unit/adjacency_store_test.cpp
@@ -213,6 +220,7 @@ add_executable(
     unit/memory_history_test.cpp
     unit/node_store_test.cpp
     unit/query_dsl_test.cpp
+    unit/query_executor_test.cpp
     unit/replay_test.cpp
     unit/runtime_types_test.cpp
     unit/snapshot_test.cpp

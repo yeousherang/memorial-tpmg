@@ -41,6 +41,13 @@ class adjacency_store<edge_spec<Source, Relation, Target, Properties...>> {
     [[nodiscard]] size_type id_base() const noexcept { return id_base_; }
     [[nodiscard]] size_type extent() const noexcept { return id_base_ + size_; }
     [[nodiscard]] bool empty() const noexcept { return size_ == 0; }
+    [[nodiscard]] bool contains(id_type id) const noexcept {
+        if (!id.is_valid()) {
+            return false;
+        }
+        const auto value = static_cast<size_type>(id.value());
+        return value >= id_base_ && value < extent();
+    }
 
     template <typename... Values>
         requires(sizeof...(Values) == sizeof...(Properties)) &&
