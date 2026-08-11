@@ -330,6 +330,8 @@ evaluate(const snapshot<Schema>& graph,
         return std::unexpected(input.error());
     }
     id_list<target> output;
+    output.reserve(
+        graph.template estimate_traversal_cardinality<source, Relation, target>(input->size()));
     for (const auto source_id : *input) {
         const auto edges = graph.template outgoing<source, Relation, target>(source_id);
         if (!edges) {

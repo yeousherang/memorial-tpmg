@@ -6,6 +6,7 @@
 #include <memorial/schema/graph_schema.hpp>
 #include <memorial/storage/delta_store.hpp>
 
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <utility>
@@ -81,6 +82,15 @@ template <GraphSchema Schema> class snapshot {
         requires schema_has_edge_v<Source, Relation, Target, schema_type>
     [[nodiscard]] std::size_t edge_extent() const noexcept {
         return data_->template edge_extent<Source, Relation, Target>();
+    }
+
+    template <typename Source, typename Relation, typename Target>
+        requires schema_has_edge_v<Source, Relation, Target, schema_type>
+    [[nodiscard]] std::size_t
+    estimate_traversal_cardinality(std::size_t source_count) const noexcept {
+        const auto average_degree = relation_average_degree<Source, Relation, Target>();
+        return static_cast<std::size_t>(
+            std::ceil(static_cast<double>(source_count) * average_degree));
     }
 
     template <typename Tag>
@@ -289,6 +299,17 @@ template <GraphSchema Schema> class snapshot {
              std::shared_ptr<const snapshot> parent) noexcept
         : generation_{generation}, worldline_{worldline}, valid_at_{valid_at}, known_at_{known_at},
           data_{std::move(data)}, parent_{std::move(parent)} {}
+
+    template <typename Source, typename Relation, typename Target>
+    [[nodiscard]] double relation_average_degree() const noexcept {
+        auto average = data_->template edges<Source, Relation, Target>()
+                           .degree_statistics()
+                           .average_out_degree;
+        if (parent_) {
+            average += parent_->template relation_average_degree<Source, Relation, Target>();
+        }
+        return average;
+    }
 
     template <typename Tag> [[nodiscard]] result<void> check_visibility(node_id<Tag> id) const {
         const auto& nodes = data_->template nodes<Tag>();

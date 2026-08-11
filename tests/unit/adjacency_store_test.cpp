@@ -105,4 +105,41 @@ TEST(AdjacencyStore, RejectsEndpointsFromDifferentWorldlines) {
     EXPECT_EQ(edge.error().code(), memorial::graph_errc::worldline_mismatch);
 }
 
+TEST(AdjacencyStore, BuildsRelationDegreeStatistics) {
+    memorial::delta_store<memorial::memorial_schema> delta;
+    const row_context context;
+    auto& experiences = delta.nodes<memorial::domain::experience_tag>();
+    auto& perceptions = delta.nodes<memorial::domain::perception_tag>();
+    const auto first = experiences.append(context.worldline, context.valid, context.transaction,
+                                          context.source, 0.9F);
+    const auto second = experiences.append(context.worldline, context.valid, context.transaction,
+                                           context.source, 0.8F);
+    const auto target = perceptions.append(context.worldline, context.valid, context.transaction,
+                                           context.source, 0.7F);
+    ASSERT_TRUE(first);
+    ASSERT_TRUE(second);
+    ASSERT_TRUE(target);
+    ASSERT_TRUE(
+        (delta.append_edge<memorial::domain::experience_tag, memorial::domain::generates_relation,
+                           memorial::domain::perception_tag>(*first, *target, 0.9)));
+    ASSERT_TRUE(
+        (delta.append_edge<memorial::domain::experience_tag, memorial::domain::generates_relation,
+                           memorial::domain::perception_tag>(*first, *target, 0.8)));
+    ASSERT_TRUE(
+        (delta.append_edge<memorial::domain::experience_tag, memorial::domain::generates_relation,
+                           memorial::domain::perception_tag>(*second, *target, 0.7)));
+
+    delta.build_indices();
+    const auto& statistics =
+        delta
+            .edges<memorial::domain::experience_tag, memorial::domain::generates_relation,
+                   memorial::domain::perception_tag>()
+            .degree_statistics();
+
+    EXPECT_EQ(statistics.edge_count, 3U);
+    EXPECT_EQ(statistics.source_count, 2U);
+    EXPECT_EQ(statistics.maximum_out_degree, 2U);
+    EXPECT_DOUBLE_EQ(statistics.average_out_degree, 1.5);
+}
+
 } // namespace

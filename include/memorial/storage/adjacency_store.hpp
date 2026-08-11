@@ -3,6 +3,7 @@
 #include <memorial/runtime/error.hpp>
 #include <memorial/schema/edge.hpp>
 
+#include <algorithm>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -15,6 +16,13 @@
 #include <vector>
 
 namespace memorial {
+
+struct relation_degree_statistics {
+    std::size_t edge_count{};
+    std::size_t source_count{};
+    std::size_t maximum_out_degree{};
+    double average_out_degree{};
+};
 
 template <PropertySpec Property> struct edge_property_column {
     using property = Property;
@@ -41,6 +49,27 @@ class adjacency_store<edge_spec<Source, Relation, Target, Properties...>> {
     [[nodiscard]] size_type id_base() const noexcept { return id_base_; }
     [[nodiscard]] size_type extent() const noexcept { return id_base_ + size_; }
     [[nodiscard]] bool empty() const noexcept { return size_ == 0; }
+    [[nodiscard]] bool statistics_ready() const noexcept { return statistics_ready_; }
+    [[nodiscard]] const relation_degree_statistics& degree_statistics() const noexcept {
+        return degree_statistics_;
+    }
+
+    void build_statistics() noexcept {
+        degree_statistics_ = {};
+        degree_statistics_.edge_count = size_;
+        degree_statistics_.source_count = outgoing_.size();
+        for (const auto& [source, edges] : outgoing_) {
+            static_cast<void>(source);
+            degree_statistics_.maximum_out_degree =
+                std::max(degree_statistics_.maximum_out_degree, edges.size());
+        }
+        if (degree_statistics_.source_count != 0U) {
+            degree_statistics_.average_out_degree =
+                static_cast<double>(degree_statistics_.edge_count) /
+                static_cast<double>(degree_statistics_.source_count);
+        }
+        statistics_ready_ = true;
+    }
     [[nodiscard]] bool contains(id_type id) const noexcept {
         if (!id.is_valid()) {
             return false;
@@ -61,6 +90,7 @@ class adjacency_store<edge_spec<Source, Relation, Target, Properties...>> {
         if (extent() >= static_cast<size_type>(id_type::invalid_value)) {
             return std::unexpected(graph_error{graph_errc::capacity_exceeded});
         }
+        statistics_ready_ = false;
 
         auto pending =
             std::tuple<source_id_type, target_id_type, typename Properties::value_type...>{
@@ -182,6 +212,8 @@ class adjacency_store<edge_spec<Source, Relation, Target, Properties...>> {
     std::unordered_map<target_id_type, std::vector<id_type>> incoming_;
     size_type id_base_{};
     size_type size_{};
+    relation_degree_statistics degree_statistics_;
+    bool statistics_ready_{};
 };
 
 } // namespace memorial

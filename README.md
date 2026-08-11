@@ -31,7 +31,7 @@ Memorial TPMG는 인간의 경험, 지각, 생각, 감정, 선택, 결과, 기�
 
 이 저장소는 초기 구현 단계다. C++23/CMake 프로젝트 기반, 예제, 테스트 및 compile-fail 하네스가 준비되어 있다. API와 파일 배치는 구현 과정에서 변경될 수 있으며, 중요한 변경은 ADR로 남긴다.
 
-현재 구현된 범위는 정적 스키마, strong ID, 기본 Memorial 도메인 스키마, 컴파일타임 검증, 런타임 ID·시간·provenance 타입, append-only typed node delta, relation별 양방향 adjacency, 불변 generation snapshot, sequence 기반 이벤트 로그, checkpoint/replay, canonical state/log hash, 이중 시간 memory reinterpretation, worldline registry/fork, copy-on-write branch snapshot, 정적 쿼리 AST DSL, 스냅샷 실행기, 초기 정적 최적화와 `explain()` 실행 계획, 게시 시점에 구축되는 시간·월드라인·속성 선택 인덱스다. 숫자 속성에는 16버킷 분포 통계를 만들며, 실행기는 예상 후보가 현재 입력의 80% 미만일 때 속성 인덱스를 선택한다. 관계 degree 통계와 다단계 교차 비용 모델은 아직 구현되지 않았다.
+현재 구현된 범위는 정적 스키마, strong ID, 기본 Memorial 도메인 스키마, 컴파일타임 검증, 런타임 ID·시간·provenance 타입, append-only typed node delta, relation별 양방향 adjacency, 불변 generation snapshot, sequence 기반 이벤트 로그, checkpoint/replay, canonical state/log hash, 이중 시간 memory reinterpretation, worldline registry/fork, copy-on-write branch snapshot, 정적 쿼리 AST DSL, 스냅샷 실행기, 초기 정적 최적화와 `explain()` 실행 계획, 게시 시점에 구축되는 시간·월드라인·속성 선택 인덱스다. 숫자 속성에는 16버킷 분포 통계를 만들며, 실행기는 예상 후보가 현재 입력의 80% 미만일 때 속성 인덱스를 선택한다. relation별 평균·최대 out-degree 통계는 traversal cardinality 추정과 결과 용량 계획에 사용한다. 병렬 traversal과 다단계 교차 비용 모델은 아직 구현되지 않았다.
 
 의사결정 에피소드 통합 예제는 다음과 같이 실행한다.
 

@@ -387,7 +387,10 @@ template <GraphSchema Schema> class delta_store {
   public:
     using schema_type = Schema;
 
-    void build_indices() { build_node_indices(typename schema_type::nodes{}); }
+    void build_indices() {
+        build_node_indices(typename schema_type::nodes{});
+        build_edge_statistics(typename schema_type::edges{});
+    }
 
     template <typename Parent> [[nodiscard]] static delta_store branch_from(const Parent& parent) {
         delta_store result;
@@ -465,6 +468,9 @@ template <GraphSchema Schema> class delta_store {
   private:
     template <NodeSpec... Nodes> void build_node_indices(meta::type_list<Nodes...>) {
         (std::get<delta_node_store<Nodes>>(node_stores_.values).build_indices(), ...);
+    }
+    template <EdgeSpec... Edges> void build_edge_statistics(meta::type_list<Edges...>) {
+        (std::get<adjacency_store<Edges>>(edge_stores_.values).build_statistics(), ...);
     }
     template <typename Tag> [[nodiscard]] bool endpoint_exists(node_id<Tag> id) const noexcept {
         return id.is_valid() && (static_cast<std::size_t>(id.value()) < nodes<Tag>().id_base() ||

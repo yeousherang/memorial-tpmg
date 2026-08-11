@@ -71,6 +71,7 @@ struct query_plan {
     std::vector<index_candidate> index_candidates;
     std::vector<kernel_candidate> kernel_candidates;
     std::size_t estimated_cardinality{};
+    std::size_t estimated_traversal_cardinality{};
     std::size_t actual_cardinality{};
 };
 
@@ -124,6 +125,45 @@ template <typename Node> struct source_node_tag<source_expr<Node>> {
 };
 template <typename Previous, typename Operation>
 struct source_node_tag<pipeline_expr<Previous, Operation>> : source_node_tag<Previous> {};
+
+struct cardinality_estimate {
+    std::size_t current{};
+    std::size_t traversal{};
+};
+
+template <GraphSchema Schema, typename Node>
+[[nodiscard]] cardinality_estimate
+estimate_cardinality(const snapshot<Schema>&, const source_expr<Node>&, std::size_t source_count) {
+    return {source_count, 0U};
+}
+
+template <GraphSchema Schema, typename Previous, typename Relation, typename Target>
+[[nodiscard]] cardinality_estimate
+estimate_cardinality(const snapshot<Schema>& graph,
+                     const pipeline_expr<Previous, traverse_expr<Relation, Target>>& expression,
+                     std::size_t source_count);
+
+template <GraphSchema Schema, typename Previous, typename Operation>
+[[nodiscard]] cardinality_estimate
+estimate_cardinality(const snapshot<Schema>& graph,
+                     const pipeline_expr<Previous, Operation>& expression,
+                     std::size_t source_count) {
+    return estimate_cardinality(graph, expression.previous, source_count);
+}
+
+template <GraphSchema Schema, typename Previous, typename Relation, typename Target>
+[[nodiscard]] cardinality_estimate
+estimate_cardinality(const snapshot<Schema>& graph,
+                     const pipeline_expr<Previous, traverse_expr<Relation, Target>>& expression,
+                     std::size_t source_count) {
+    auto estimate = estimate_cardinality(graph, expression.previous, source_count);
+    using source = typename optimizer_node_tag<Previous>::type;
+    using target = query_node_tag_t<Target>;
+    estimate.current =
+        graph.template estimate_traversal_cardinality<source, Relation, target>(estimate.current);
+    estimate.traversal = estimate.current;
+    return estimate;
+}
 
 inline constexpr std::uint64_t signature_offset = 14695981039346656037ULL;
 inline constexpr std::uint64_t signature_prime = 1099511628211ULL;
@@ -276,6 +316,8 @@ explain(const snapshot<Schema>& graph,
     if (!source_candidates) {
         return std::unexpected(source_candidates.error());
     }
+    const auto cardinality =
+        detail::estimate_cardinality(graph, optimized.expression(), source_candidates->size());
 
     query_plan plan;
     plan.signature =
@@ -304,10 +346,12 @@ explain(const snapshot<Schema>& graph,
          has_filter ? "selected for temporal, worldline, and property lookup"
                     : "selected for temporal and worldline source lookup"},
         {kernel_kind::single_thread_traversal, has_traversal,
-         has_traversal ? "selected for adjacency traversal" : "query has no traversal"},
+         has_traversal ? "selected with degree-based output capacity planning"
+                       : "query has no traversal"},
         {kernel_kind::parallel_traversal, false, "parallel traversal is not implemented"},
     };
     plan.estimated_cardinality = source_candidates->size();
+    plan.estimated_traversal_cardinality = cardinality.traversal;
     plan.actual_cardinality = execution->size();
     return plan;
 }

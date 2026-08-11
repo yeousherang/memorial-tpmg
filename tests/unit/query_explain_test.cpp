@@ -48,6 +48,7 @@ TEST(QueryExplain, ReportsOptimizedPlanColumnsCandidatesAndCardinality) {
     EXPECT_EQ(plan->required_columns[0].key, "activation");
     EXPECT_EQ(plan->required_columns[1].key, "confidence");
     EXPECT_EQ(plan->estimated_cardinality, 1U);
+    EXPECT_EQ(plan->estimated_traversal_cardinality, 1U);
     EXPECT_EQ(plan->actual_cardinality, 1U);
 
     const auto adjacency = std::ranges::find_if(plan->index_candidates, [](const auto& candidate) {
